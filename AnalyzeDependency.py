@@ -4,7 +4,7 @@
 import subprocess
 import xml.etree.ElementTree as ET
 import re
-import sys
+import sys, os
 import types
 import argparse
 from TreeBuilder import TreeBuilder
@@ -20,7 +20,8 @@ MODIFIED_DEPENDENCY_FILE = "modifiedDependency.txt"
 
 # add the dependencies used commonly
 # TODO: change the working directory
-def add_common_dependency (pom):
+def add_common_dependency (pom, project_dir):
+    os.chdir(project_dir)
 
     try:
         proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
@@ -30,8 +31,6 @@ def add_common_dependency (pom):
     tree = TreeBuilder(DEPENDENCY_TREE_FILE).build()
 
     find_common_dependency (pom, tree.root)
-
-    pretty_pom(pom)
 
 
 def find_common_dependency (pom, root):
@@ -84,9 +83,11 @@ def add_dependency (pom, data):
 
 
 # add used and undeclared dependency
-# 调用analyze必须在项目文件夹下，否则analyze没有作用
-def add_used_undeclared_dependency (pom): 
-    analyze_output = "dependencyAnalyze.xml"
+def add_used_undeclared_dependency (pom, project_dir): 
+
+    os.chdir(project_dir)
+
+    analyze_output = "dependencyAnalyze.txt"
     analyze_pom = open(analyze_output, "w")  #write the result of analyze to this file
     try:
         proc = subprocess.check_call(["mvn", "clean", "dependency:analyze", "-DoutputXML"], stdout=analyze_pom) 
@@ -99,13 +100,13 @@ def add_used_undeclared_dependency (pom):
     data = ""
     flag = False
     data_construct_finished = False
-    returnStatus = 0 #decide whether calling this function again
+    return_status = False #decide whether calling this function again
     for line in analyze_pom:
         line = line.strip()
 
         if line == "<dependency>":
             flag = True
-            returnStatus = 1
+            return_status = True
             continue
         elif line == "</dependency>":
             flag = False
@@ -133,34 +134,12 @@ def add_used_undeclared_dependency (pom):
             data = ""
 
     analyze_pom.close()
-    return returnStatus
-
-def pretty_pom (pom):
-    tree = ET.parse("pom.xml")
-    root = tree.getroot()
-    pretty_pom_run(root, "    ", "\n")
-    tree.write("pom.xml", method = "xml")
+    return return_status
 
 
-# modify the pom.xml to make it look comfortable
-def pretty_pom_run (element, indent, newline, level = 0): # elemnt为传进来的Elment类，参数indent用于缩进，newline用于换行  
-    if element:  # 判断element是否有子元素  
-        if element.text == None or element.text.isspace(): # 如果element的text没有内容  
-            element.text = newline + indent * (level + 1)    
-        else:  
-            element.text = newline + indent * (level + 1) + element.text.strip() + newline + indent * (level + 1)  
-    #else:  # 此处两行如果把注释去掉，Element的text也会另起一行  
+def exclude_heavy_transitive_depency (pom, project_dir):
+    os.chdir(project_dir)
 
-    temp = list(element) # 将elemnt转成list  
-    for subelement in temp:  
-        if temp.index(subelement) < (len(temp) - 1): # 如果不是list的最后一个元素，说明下一个行是同级别元素的起始，缩进应一致  
-            subelement.tail = newline + indent * (level + 1)  
-        else:  # 如果是list的最后一个元素， 说明下一行是母元素的结束，缩进应该少一个  
-            subelement.tail = newline + indent * level  
-        pretty_pom_run(subelement, indent, newline, level = level + 1) # 对子元素进行递归操作  
-
-
-def exclude_heavy_transitive_depency (pom):
     try:
         proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
     except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
@@ -232,10 +211,29 @@ def exclude_dependency (pom, child_dependency, root_dependency):
     tree.write(pom, method = "xml")
 
 
-def print_help():
-    print ("\n[INFO] Method add_common_dependency will add the dependencies used commonly to pom.xml.\n")
-    print ("[INFO] Method add_used_undeclared_dependency will add used but undeclared dependencies to pom.xml.\n")
-    print ("[INFO] Method exclude_dependency will exclude heavy transitive dependencies at level 2 from pom.xml. Please note that this method will remove dependencies and project might doesn't work after removing.\n")
+def pretty_pom (pom):
+    tree = ET.parse(pom)
+    root = tree.getroot()
+    pretty_pom_run(root, "    ", "\n")
+    tree.write(pom, method = "xml")
+
+
+# modify the pom.xml to make it look comfortable
+def pretty_pom_run (element, indent, newline, level = 0): # elemnt为传进来的Elment类，参数indent用于缩进，newline用于换行  
+    if element:  # 判断element是否有子元素  
+        if element.text == None or element.text.isspace(): # 如果element的text没有内容  
+            element.text = newline + indent * (level + 1)    
+        else:  
+            element.text = newline + indent * (level + 1) + element.text.strip() + newline + indent * (level + 1)  
+    #else:  # 此处两行如果把注释去掉，Element的text也会另起一行  
+
+    temp = list(element) # 将elemnt转成list  
+    for subelement in temp:  
+        if temp.index(subelement) < (len(temp) - 1): # 如果不是list的最后一个元素，说明下一个行是同级别元素的起始，缩进应一致  
+            subelement.tail = newline + indent * (level + 1)  
+        else:  # 如果是list的最后一个元素， 说明下一行是母元素的结束，缩进应该少一个  
+            subelement.tail = newline + indent * level  
+        pretty_pom_run(subelement, indent, newline, level = level + 1) # 对子元素进行递归操作  
 
 
 def main():
@@ -249,16 +247,31 @@ def main():
     args = parser.parse_args()
 
     project_dir = os.path.dirname(args.path)
-    os.chdir(project_dir)
 
     if args.addcommon:
-        add_common_dependency(args.path)
+        print ("[INFO] Adding common dependencies...")
 
-    if args.addcommon:
-        add_common_dependency(args.path)
+        add_common_dependency(args.path, project_dir)
 
-    if args.addcommon:
-        add_common_dependency(args.path)
+        
+    if args.addundeclared:
+        print ("[INFO] Adding used and undeclared dependencies...")
+
+        status = add_used_undeclared_dependency(args.path, project_dir)
+        while status:
+            status = add_used_undeclared_dependency(args.path, project_dir)
+        
+
+    if args.exclude:
+        print ("[INFO] Excluding heavy transitive dependencies...")
+
+        status = exclude_heavy_transitive_depency(args.path, project_dir)
+        while status:
+            status = exclude_heavy_transitive_depency (args.path, project_dir)
+
+
+    if args.addcommon or args.addundeclared or args.exclude:
+        pretty_pom(args.path)
             
 
     # #clear the modifiedDependency.txt
