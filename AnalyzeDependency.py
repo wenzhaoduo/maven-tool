@@ -19,7 +19,8 @@ MODIFIED_DEPENDENCY_FILE = "modifiedDependency.txt"
 
 # add the dependencies used commonly
 def add_common_dependency (pom, project_dir):
-    os.chdir(project_dir)
+    if project_dir != "":
+        os.chdir(project_dir)
 
     try:
         proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
@@ -48,9 +49,7 @@ def find_common_dependency (pom, root):
 
 
 def add_dependency (pom, data):
-    with open(MODIFIED_DEPENDENCY_FILE, "a") as f:
-        f.write(data)
-        f.write("\n")
+    print (data)
 
     tree = ET.parse(pom)
     root = tree.getroot()
@@ -84,7 +83,8 @@ def add_dependency (pom, data):
 
 # add used and undeclared dependency
 def add_used_undeclared_dependency (pom, project_dir): 
-    os.chdir(project_dir)
+    if project_dir != "":
+        os.chdir(project_dir)
 
     analyze_output = "dependencyAnalyze.txt"
     analyze_pom = open(analyze_output, "w")  #write the result of analyze to this file
@@ -138,7 +138,8 @@ def add_used_undeclared_dependency (pom, project_dir):
 
 
 def exclude_heavy_transitive_depency (pom, project_dir):
-    os.chdir(project_dir)
+    if project_dir != "":
+        os.chdir(project_dir)
 
     try:
         proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
@@ -169,9 +170,10 @@ def count_children (root):
 
 # exclude the child_dependency from root_dependency
 def exclude_dependency (pom, child_dependency, root_dependency):
-    with open(MODIFIED_DEPENDENCY_FILE, "a") as f:
-        f.write(child_dependency)
-        f.write("\n")
+    # with open(MODIFIED_DEPENDENCY_FILE, "a") as f:
+    #     f.write(child_dependency)
+    #     f.write("\n")
+    print (child_dependency)
 
     root_dependency_info = root_dependency.split(":")
     child_dependency_info = child_dependency.split(":")
@@ -250,26 +252,35 @@ def main():
     project_dir = os.path.dirname(args.path)
 
     if args.addcommon:
+        print ("[INFO]----------------------------------------------------------------------")
         print ("[INFO] Adding common dependencies...")
+        print ("[INFO] Dependecies are added bacause they are commonly used.\n")
 
         add_common_dependency(args.path, project_dir)
+
+        print ("[INFO]----------------------------------------------------------------------\n")
 
         
     if args.addundeclared:
         print ("[INFO] Adding used and undeclared dependencies...")
+        print ("[INFO] Dependecies are added bacause they are used and undeclared.\n")
 
         status = add_used_undeclared_dependency(args.path, project_dir)
         while status:
             status = add_used_undeclared_dependency(args.path, project_dir)
+
+        print ("[INFO]----------------------------------------------------------------------\n")
         
 
     if args.exclude:
         print ("[INFO] Excluding heavy transitive dependencies...")
+        print ("[INFO]----------------------------------------------------------------------\n")
 
         status = exclude_heavy_transitive_depency(args.path, project_dir)
         while status:
             status = exclude_heavy_transitive_depency (args.path, project_dir)
 
+        print ("[INFO]----------------------------------------------------------------------\n")
 
     if args.addcommon or args.addundeclared or args.exclude:
         pretty_pom(args.path)
