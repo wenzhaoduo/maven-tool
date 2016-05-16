@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 import re
 import sys
 import types
+import argparse
 from TreeBuilder import TreeBuilder
 
 #namespace
@@ -18,7 +19,9 @@ MODIFIED_DEPENDENCY_FILE = "modifiedDependency.txt"
 
 
 # add the dependencies used commonly
+# TODO: change the working directory
 def add_common_dependency (pom):
+
     try:
         proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
     except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
@@ -28,10 +31,12 @@ def add_common_dependency (pom):
 
     find_common_dependency (pom, tree.root)
 
+    pretty_pom(pom)
+
 
 def find_common_dependency (pom, root):
     for child in root.children:
-        if child.get_times() >= 5:
+        if child.get_times() >= 5 and child.get_level() > 1:
             jar_info = child.get_data().split(":")
             dependency = jar_info[0] + ":" + jar_info[1] + ":" + jar_info[-2]
 
@@ -43,9 +48,43 @@ def find_common_dependency (pom, root):
         find_common_dependency (pom, child)
 
 
+def add_dependency (pom, data):
+    with open(MODIFIED_DEPENDENCY_FILE, "a") as f:
+        f.write(data)
+        f.write("\n")
+
+    tree = ET.parse(pom)
+    root = tree.getroot()
+    dependencies = root.find("%sdependencies" %(POM_NS))
+
+    dependency = ET.SubElement(dependencies, "dependency")
+    dependency.tail = "\n"
+    dependency.text = "\n"
+
+    jar_info = data.split(":")
+
+    childElement = ET.SubElement(dependency, "groupId")
+    childElement.text = jar_info[0]
+    childElement.tail = "\n"
+
+    childElement = ET.SubElement(dependency, "artifactId")
+    childElement.text = jar_info[1]
+    childElement.tail = "\n"
+
+    childElement = ET.SubElement(dependency, "version")
+    childElement.text = jar_info[2]
+    childElement.tail = "\n"
+
+    if len(jar_info) == 4:
+        childElement = ET.SubElement(dependency, "classifier")
+        childElement.text = jar_info[3]
+        childElement.tail = "\n"
+
+    tree.write(pom, method = "xml")
+
+
 # add used and undeclared dependency
-#TODO: keep the comment when revise the pom file.
-#TODO: handle classifier tag
+# 调用analyze必须在项目文件夹下，否则analyze没有作用
 def add_used_undeclared_dependency (pom): 
     analyze_output = "dependencyAnalyze.xml"
     analyze_pom = open(analyze_output, "w")  #write the result of analyze to this file
@@ -96,45 +135,15 @@ def add_used_undeclared_dependency (pom):
     analyze_pom.close()
     return returnStatus
 
-
-#TODO: handle the dependency with classifier tag.
-def add_dependency (pom, data):
-    with open(MODIFIED_DEPENDENCY_FILE, "a") as f:
-        f.write(data)
-        f.write("\n")
-
-    tree = ET.parse(pom)
+def pretty_pom (pom):
+    tree = ET.parse("pom.xml")
     root = tree.getroot()
-    dependencies = root.find("%sdependencies" %(POM_NS))
-
-    dependency = ET.SubElement(dependencies, "dependency")
-    dependency.tail = "\n"
-    dependency.text = "\n"
-
-    jar_info = data.split(":")
-
-    childElement = ET.SubElement(dependency, "groupId")
-    childElement.text = jar_info[0]
-    childElement.tail = "\n"
-
-    childElement = ET.SubElement(dependency, "artifactId")
-    childElement.text = jar_info[1]
-    childElement.tail = "\n"
-
-    childElement = ET.SubElement(dependency, "version")
-    childElement.text = jar_info[2]
-    childElement.tail = "\n"
-
-    if len(jar_info) == 4:
-        childElement = ET.SubElement(dependency, "classifier")
-        childElement.text = jar_info[3]
-        childElement.tail = "\n"
-
-    tree.write(pom, method = "xml")
+    pretty_pom_run(root, "    ", "\n")
+    tree.write("pom.xml", method = "xml")
 
 
 # modify the pom.xml to make it look comfortable
-def pretty_pom (element, indent, newline, level = 0): # elemnt为传进来的Elment类，参数indent用于缩进，newline用于换行  
+def pretty_pom_run (element, indent, newline, level = 0): # elemnt为传进来的Elment类，参数indent用于缩进，newline用于换行  
     if element:  # 判断element是否有子元素  
         if element.text == None or element.text.isspace(): # 如果element的text没有内容  
             element.text = newline + indent * (level + 1)    
@@ -148,7 +157,7 @@ def pretty_pom (element, indent, newline, level = 0): # elemnt为传进来的Elm
             subelement.tail = newline + indent * (level + 1)  
         else:  # 如果是list的最后一个元素， 说明下一行是母元素的结束，缩进应该少一个  
             subelement.tail = newline + indent * level  
-        pretty_pom(subelement, indent, newline, level = level + 1) # 对子元素进行递归操作  
+        pretty_pom_run(subelement, indent, newline, level = level + 1) # 对子元素进行递归操作  
 
 
 def exclude_heavy_transitive_depency (pom):
@@ -183,7 +192,6 @@ def exclude_dependency (pom, child_dependency, root_dependency):
     with open(MODIFIED_DEPENDENCY_FILE, "a") as f:
         f.write(child_dependency)
         f.write("\n")
-
 
     root_dependency_info = root_dependency.split(":")
     child_dependency_info = child_dependency.split(":")
@@ -223,59 +231,88 @@ def exclude_dependency (pom, child_dependency, root_dependency):
 
     tree.write(pom, method = "xml")
 
+
+def print_help():
+    print ("\n[INFO] Method add_common_dependency will add the dependencies used commonly to pom.xml.\n")
+    print ("[INFO] Method add_used_undeclared_dependency will add used but undeclared dependencies to pom.xml.\n")
+    print ("[INFO] Method exclude_dependency will exclude heavy transitive dependencies at level 2 from pom.xml. Please note that this method will remove dependencies and project might doesn't work after removing.\n")
+
+
 def main():
-    #clear the modifiedDependency.txt
-    f = open(MODIFIED_DEPENDENCY_FILE, "w")
-    f.write("")
-    f.close()
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("path", help = "the path of pom file")
+    parser.add_argument("-addcommon", help = "add common dependencies", action = "store_true")
+    parser.add_argument("-addundeclared", help = " add used and undeclared dependencies", action = "store_true")
+    parser.add_argument("-exclude", help = "exclude heavy transitive dependencies. Please note that this method will remove dependencies and project might doesn't work after removing. Do not use this until you can handle when the project compiles or runs unsuccessfully.", action = "store_true")
+
+    args = parser.parse_args()
+
+    project_dir = os.path.dirname(args.path)
+    os.chdir(project_dir)
+
+    if args.addcommon:
+        add_common_dependency(args.path)
+
+    if args.addcommon:
+        add_common_dependency(args.path)
+
+    if args.addcommon:
+        add_common_dependency(args.path)
+            
+
+    # #clear the modifiedDependency.txt
+    # f = open(MODIFIED_DEPENDENCY_FILE, "w")
+    # f.write("")
+    # f.close()
 
 
-    print ("[INFO] Adding common dependencies...")
+    # print ("[INFO] Adding common dependencies...")
 
-    f = open(MODIFIED_DEPENDENCY_FILE, "a")
-    f.write("[INFO] Dependecies are added bacause they are commonly used.\n")
-    f.write("[INFO]------------------------------------------------------------------------------------\n")
-    f.close()
+    # f = open(MODIFIED_DEPENDENCY_FILE, "a")
+    # f.write("[INFO] Dependecies are added bacause they are commonly used.\n")
+    # f.write("[INFO]------------------------------------------------------------------------------------\n")
+    # f.close()
 
-    add_common_dependency("pom.xml")
+    # add_common_dependency("pom.xml")
 
-    f = open(MODIFIED_DEPENDENCY_FILE, "a")
-    f.write("[INFO]------------------------------------------------------------------------------------\n\n")
-
-
-    print ("[INFO] Adding used and undeclared dependencies...")
-
-    f.write("[INFO] Dependecies are added bacause they are used and undeclared.\n")
-    f.write("[INFO]------------------------------------------------------------------------------------\n")
-    f.close()
-
-    status = add_used_undeclared_dependency("pom.xml")
-    while status == 1:
-        status = add_used_undeclared_dependency("pom.xml")
-
-    f = open(MODIFIED_DEPENDENCY_FILE, "a")
-    f.write("[INFO]------------------------------------------------------------------------------------\n\n")
+    # f = open(MODIFIED_DEPENDENCY_FILE, "a")
+    # f.write("[INFO]------------------------------------------------------------------------------------\n\n")
 
 
-    print ("[INFO] Excluding heavy transitive dependencies...")
+    # print ("[INFO] Adding used and undeclared dependencies...")
 
-    f.write("[INFO] These are heavy transitive dependecies excluded.\n")
-    f.write("[INFO]------------------------------------------------------------------------------------\n")
-    f.close()
+    # f.write("[INFO] Dependecies are added bacause they are used and undeclared.\n")
+    # f.write("[INFO]------------------------------------------------------------------------------------\n")
+    # f.close()
 
-    exclude_flag = exclude_heavy_transitive_depency("pom.xml")
-    while exclude_flag:
-        exclude_flag = exclude_heavy_transitive_depency ("pom.xml")
+    # status = add_used_undeclared_dependency("pom.xml")
+    # while status == 1:
+    #     status = add_used_undeclared_dependency("pom.xml")
 
-    f = open(MODIFIED_DEPENDENCY_FILE, "a")
-    f.write("[INFO]------------------------------------------------------------------------------------\n\n")
-    f.close()
+    # f = open(MODIFIED_DEPENDENCY_FILE, "a")
+    # f.write("[INFO]------------------------------------------------------------------------------------\n\n")
 
 
-    tree = ET.parse("pom.xml")
-    root = tree.getroot()
-    pretty_pom(root, "    ", "\n")
-    tree.write("pom.xml", method = "xml")
+    # print ("[INFO] Excluding heavy transitive dependencies...")
+
+    # f.write("[INFO] These are heavy transitive dependecies excluded.\n")
+    # f.write("[INFO]------------------------------------------------------------------------------------\n")
+    # f.close()
+
+    # exclude_flag = exclude_heavy_transitive_depency("pom.xml")
+    # while exclude_flag:
+    #     exclude_flag = exclude_heavy_transitive_depency ("pom.xml")
+
+    # f = open(MODIFIED_DEPENDENCY_FILE, "a")
+    # f.write("[INFO]------------------------------------------------------------------------------------\n\n")
+    # f.close()
+
+
+    # tree = ET.parse("pom.xml")
+    # root = tree.getroot()
+    # pretty_pom(root, "    ", "\n")
+    # tree.write("pom.xml", method = "xml")
 
 
 if __name__ == '__main__':
