@@ -5,7 +5,6 @@ import subprocess
 import xml.etree.ElementTree as ET
 import re
 import sys, os
-import types
 import argparse
 from TreeBuilder import TreeBuilder
 
@@ -19,7 +18,6 @@ MODIFIED_DEPENDENCY_FILE = "modifiedDependency.txt"
 
 
 # add the dependencies used commonly
-# TODO: change the working directory
 def add_common_dependency (pom, project_dir):
     os.chdir(project_dir)
 
@@ -31,6 +29,8 @@ def add_common_dependency (pom, project_dir):
     tree = TreeBuilder(DEPENDENCY_TREE_FILE).build()
 
     find_common_dependency (pom, tree.root)
+
+    proc = subprocess.check_call(["rm", DEPENDENCY_TREE_FILE])
 
 
 def find_common_dependency (pom, root):
@@ -84,7 +84,6 @@ def add_dependency (pom, data):
 
 # add used and undeclared dependency
 def add_used_undeclared_dependency (pom, project_dir): 
-
     os.chdir(project_dir)
 
     analyze_output = "dependencyAnalyze.txt"
@@ -134,6 +133,7 @@ def add_used_undeclared_dependency (pom, project_dir):
             data = ""
 
     analyze_pom.close()
+    proc = subprocess.check_call(["rm", "dependencyAnalyze.txt"])
     return return_status
 
 
@@ -156,6 +156,7 @@ def exclude_heavy_transitive_depency (pom, project_dir):
                 exclude_dependency(pom, grandchild.get_data(), child.get_data())
                 exclude_flag = True
 
+    proc = subprocess.check_call(["rm", DEPENDENCY_TREE_FILE])
     return exclude_flag
 
 
@@ -287,45 +288,26 @@ def main():
     # f.write("[INFO]------------------------------------------------------------------------------------\n")
     # f.close()
 
-    # add_common_dependency("pom.xml")
-
     # f = open(MODIFIED_DEPENDENCY_FILE, "a")
     # f.write("[INFO]------------------------------------------------------------------------------------\n\n")
-
-
-    # print ("[INFO] Adding used and undeclared dependencies...")
 
     # f.write("[INFO] Dependecies are added bacause they are used and undeclared.\n")
     # f.write("[INFO]------------------------------------------------------------------------------------\n")
     # f.close()
 
-    # status = add_used_undeclared_dependency("pom.xml")
-    # while status == 1:
-    #     status = add_used_undeclared_dependency("pom.xml")
 
     # f = open(MODIFIED_DEPENDENCY_FILE, "a")
     # f.write("[INFO]------------------------------------------------------------------------------------\n\n")
 
-
-    # print ("[INFO] Excluding heavy transitive dependencies...")
 
     # f.write("[INFO] These are heavy transitive dependecies excluded.\n")
     # f.write("[INFO]------------------------------------------------------------------------------------\n")
     # f.close()
 
-    # exclude_flag = exclude_heavy_transitive_depency("pom.xml")
-    # while exclude_flag:
-    #     exclude_flag = exclude_heavy_transitive_depency ("pom.xml")
 
     # f = open(MODIFIED_DEPENDENCY_FILE, "a")
     # f.write("[INFO]------------------------------------------------------------------------------------\n\n")
     # f.close()
-
-
-    # tree = ET.parse("pom.xml")
-    # root = tree.getroot()
-    # pretty_pom(root, "    ", "\n")
-    # tree.write("pom.xml", method = "xml")
 
 
 if __name__ == '__main__':

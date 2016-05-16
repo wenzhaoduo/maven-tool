@@ -2,25 +2,29 @@
 # -*- coding: utf-8 -*-
 
 import subprocess
-import sys
+import sys,os
+import argparse
 from TreeBuilder import TreeBuilder
 from Node import Node
 
-def find_diff (new_pom, old_pom):
+def find_diff (project_dir):
+    if project_dir != "":
+        os.chdir(project_dir)
+
     try:
         proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
     except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
         sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the pom.xml.")
 
-    proc = subprocess.check_call(["mv", new_pom, "new_pom.xml"])
-    proc = subprocess.check_call(["mv", old_pom, "pom.xml"])
+    proc = subprocess.check_call(["mv", "pom.xml", "new_pom.xml"])
+    proc = subprocess.check_call(["mv", "pomBase.xml", "pom.xml"])
 
     try:
         proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=oldDependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
     except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
         sys.exit ("[ERROR]: An error occurs when generating dependency tree of old version project. Please check the old version pom.xml.")
 
-    proc = subprocess.check_call(["mv", "pom.xml", "pom_backup.xml"])
+    proc = subprocess.check_call(["mv", "pom.xml", "pomBase.xml"])
     proc = subprocess.check_call(["mv", "new_pom.xml", "pom.xml"])
 
     old_tree = TreeBuilder("oldDependencyTree.txt").build()
@@ -30,6 +34,9 @@ def find_diff (new_pom, old_pom):
 
     find_diff_and_new (new_tree.root.children, old_tree, new_dependency)
     print_new_dependency1(new_tree, new_dependency)
+
+    proc = subprocess.check_call(["rm", "dependencyTree.txt", "oldDependencyTree.txt", "pomBase.xml"])
+
 
 def find_diff_and_new (children, old_tree, new_dependency):
     for child in children: 
@@ -45,8 +52,9 @@ def find_diff_and_new (children, old_tree, new_dependency):
 
         find_diff_and_new(child.children, old_tree, new_dependency)
 
+
 def print_new_dependency1(tree, new_dependency):
-    print ("[INFO]----------------------------------------------------New dependencies found----------------------------------------------------")
+    print ("[INFO]-----------------New dependencies found-----------------")
 
     for dependency in new_dependency:
         parent = dependency
@@ -54,11 +62,39 @@ def print_new_dependency1(tree, new_dependency):
             parent = parent.get_parent()
         print ("[INFO] New dependency: \"" + dependency.toString().strip() + "\" UNDER \"" + parent.toString().strip() + "\". ")
 
-def main():
-    old_pom = "pom_backup.xml"
-    new_pom = "pom.xml"
 
-    find_diff(new_pom, old_pom)
+def get_pom_base(project_dir, branch = "master", version = None):
+    if project_dir != "":
+        os.chdir(project_dir)
+
+    proc = subprocess.check_call(["cp", "pom.xml", "pom_newversion.xml"])
+
+    if version == None:
+        proc = subprocess.check_call(["git", "fetch", "origin", branch], stdout=subprocess.PIPE)
+    else:
+        proc = subprocess.check_call(["git", "fetch", "origin", version], stdout=subprocess.PIPE)
+
+    proc = subprocess.check_call(["git", "checkout", "FETCH_HEAD", "--", "pom.xml" ])
+
+    proc = subprocess.check_call(["mv", "pom.xml", "pomBase.xml"])
+    proc = subprocess.check_call(["mv", "pom_newversion.xml", "pom.xml"])
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument("newpompath", help = "the path of pom.xml")
+
+    parser.add_argument("-b", "--branch", help = "select a branch. Default branch is master, if version number is not specified")
+    parser.add_argument("-v", "--version", help = "select a version number. If it is given, do not specify a branch.")
+
+    args = parser.parse_args()
+
+    project_dir = os.path.dirname(args.newpompath)
+
+    get_pom_base(project_dir)
+
+    find_diff(project_dir)
 
 if __name__ == "__main__":
     main()
