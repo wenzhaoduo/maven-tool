@@ -18,6 +18,7 @@ MODIFIED_DEPENDENCY_FILE = "modifiedDependency.txt"
 
 
 # add the dependencies used commonly
+# TODO: 添加参数times，让使用者决定出现多少次以上需要提到一级依赖
 def add_common_dependency (pom, project_dir):
     if project_dir != "":
         os.chdir(project_dir)
@@ -36,7 +37,7 @@ def add_common_dependency (pom, project_dir):
 
 def find_common_dependency (pom, root):
     for child in root.children:
-        if child.get_times() >= 5 and child.get_level() > 1:
+        if child.get_times() >= 5 and child.get_level() > 1: #if a dependency appear more than 5 times, declare it on the pom.xml
             jar_info = child.get_data().split(":")
             dependency = jar_info[0] + ":" + jar_info[1] + ":" + jar_info[-2]
 
@@ -137,6 +138,7 @@ def add_used_undeclared_dependency (pom, project_dir):
     return return_status
 
 
+# TODO: 添加参数times，让使用者决定二级依赖节点数在多大规模时需要exclude
 def exclude_heavy_transitive_depency (pom, project_dir):
     if project_dir != "":
         os.chdir(project_dir)
@@ -170,9 +172,6 @@ def count_children (root):
 
 # exclude the child_dependency from root_dependency
 def exclude_dependency (pom, child_dependency, root_dependency):
-    # with open(MODIFIED_DEPENDENCY_FILE, "a") as f:
-    #     f.write(child_dependency)
-    #     f.write("\n")
     print (child_dependency)
 
     root_dependency_info = root_dependency.split(":")
@@ -221,104 +220,65 @@ def pretty_pom (pom):
     tree.write(pom, method = "xml")
 
 
-# modify the pom.xml to make it look comfortable
-def pretty_pom_run (element, indent, newline, level = 0): # elemnt为传进来的Elment类，参数indent用于缩进，newline用于换行  
-    if element:  # 判断element是否有子元素  
-        if element.text == None or element.text.isspace(): # 如果element的text没有内容  
+# revise the pom.xml to make it look comfortable
+def pretty_pom_run (element, indent, newline, level = 0): 
+    if element: 
+        if element.text == None or element.text.isspace(): 
             element.text = newline + indent * (level + 1)    
         else:  
             element.text = newline + indent * (level + 1) + element.text.strip() + newline + indent * (level + 1)  
-    #else:  # 此处两行如果把注释去掉，Element的text也会另起一行  
 
-    temp = list(element) # 将elemnt转成list  
+    temp = list(element)
     for subelement in temp:  
-        if temp.index(subelement) < (len(temp) - 1): # 如果不是list的最后一个元素，说明下一个行是同级别元素的起始，缩进应一致  
+        if temp.index(subelement) < (len(temp) - 1): 
             subelement.tail = newline + indent * (level + 1)  
-        else:  # 如果是list的最后一个元素， 说明下一行是母元素的结束，缩进应该少一个  
+        else: 
             subelement.tail = newline + indent * level  
-        pretty_pom_run(subelement, indent, newline, level = level + 1) # 对子元素进行递归操作  
+        pretty_pom_run(subelement, indent, newline, level = level + 1) 
 
 
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("path", help = "the path of pom file")
+    parser.add_argument("pom", help = "the path of pom file")
     parser.add_argument("-addcommon", help = "add common dependencies", action = "store_true")
     parser.add_argument("-addundeclared", help = " add used and undeclared dependencies", action = "store_true")
     parser.add_argument("-exclude", help = "exclude heavy transitive dependencies. Please note that this method will remove dependencies and project might doesn't work after removing. Do not use this until you can handle when the project compiles or runs unsuccessfully", action = "store_true")
 
     args = parser.parse_args()
 
-    project_dir = os.path.dirname(args.path)
+    project_dir = os.path.dirname(args.pom)
 
     if args.addcommon:
-        print ("[INFO]----------------------------------------------------------------------")
-        print ("[INFO] Adding common dependencies...")
-        print ("[INFO] Dependecies are added bacause they are commonly used.\n")
+        print ("[INFO]----------Commonly used dependencies----------")
 
-        add_common_dependency(args.path, project_dir)
+        add_common_dependency(args.pom, project_dir)
 
         print ("[INFO]----------------------------------------------------------------------\n")
 
         
     if args.addundeclared:
-        print ("[INFO] Adding used and undeclared dependencies...")
-        print ("[INFO] Dependecies are added bacause they are used and undeclared.\n")
+        print ("[INFO]----------Used undeclared dependencies----------")
 
-        status = add_used_undeclared_dependency(args.path, project_dir)
+        status = add_used_undeclared_dependency(args.pom, project_dir)
         while status:
-            status = add_used_undeclared_dependency(args.path, project_dir)
+            status = add_used_undeclared_dependency(args.pom, project_dir)
 
         print ("[INFO]----------------------------------------------------------------------\n")
         
 
     if args.exclude:
-        print ("[INFO] Excluding heavy transitive dependencies...")
-        print ("[INFO]----------------------------------------------------------------------\n")
+        print ("[INFO]----------Excluded Dependencies----------")
 
-        status = exclude_heavy_transitive_depency(args.path, project_dir)
+        status = exclude_heavy_transitive_depency(args.pom, project_dir)
         while status:
-            status = exclude_heavy_transitive_depency (args.path, project_dir)
+            status = exclude_heavy_transitive_depency (args.pom, project_dir)
 
         print ("[INFO]----------------------------------------------------------------------\n")
+
 
     if args.addcommon or args.addundeclared or args.exclude:
-        pretty_pom(args.path)
-            
-
-    # #clear the modifiedDependency.txt
-    # f = open(MODIFIED_DEPENDENCY_FILE, "w")
-    # f.write("")
-    # f.close()
-
-
-    # print ("[INFO] Adding common dependencies...")
-
-    # f = open(MODIFIED_DEPENDENCY_FILE, "a")
-    # f.write("[INFO] Dependecies are added bacause they are commonly used.\n")
-    # f.write("[INFO]------------------------------------------------------------------------------------\n")
-    # f.close()
-
-    # f = open(MODIFIED_DEPENDENCY_FILE, "a")
-    # f.write("[INFO]------------------------------------------------------------------------------------\n\n")
-
-    # f.write("[INFO] Dependecies are added bacause they are used and undeclared.\n")
-    # f.write("[INFO]------------------------------------------------------------------------------------\n")
-    # f.close()
-
-
-    # f = open(MODIFIED_DEPENDENCY_FILE, "a")
-    # f.write("[INFO]------------------------------------------------------------------------------------\n\n")
-
-
-    # f.write("[INFO] These are heavy transitive dependecies excluded.\n")
-    # f.write("[INFO]------------------------------------------------------------------------------------\n")
-    # f.close()
-
-
-    # f = open(MODIFIED_DEPENDENCY_FILE, "a")
-    # f.write("[INFO]------------------------------------------------------------------------------------\n\n")
-    # f.close()
+        pretty_pom(args.pom)
 
 
 if __name__ == '__main__':

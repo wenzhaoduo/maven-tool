@@ -32,8 +32,13 @@ def find_diff (project_dir):
 
     new_dependency = []
 
+    print ("[INFO]-----------------Version changed dependencies-----------------")
     find_diff_and_new (new_tree.root.children, old_tree, new_dependency)
-    print_new_dependency1(new_tree, new_dependency)
+    print ("[INFO]-----------------------------------------------------------------------------\n")
+
+    print ("[INFO]-----------------New dependencies-----------------")
+    print_new_dependency(new_tree, new_dependency)
+    print ("[INFO]-----------------------------------------------------------------------------\n")
 
     proc = subprocess.check_call(["rm", "dependencyTree.txt", "oldDependencyTree.txt", "pomBase.xml"])
 
@@ -45,7 +50,7 @@ def find_diff_and_new (children, old_tree, new_dependency):
             parent = child
             while parent.level > 1:
                 parent = parent.get_parent()
-            print ("[WARNING] Changed dependency: \"" + found_node.toString().strip() + "\" --> \"" + child.toString().strip() + "\" UNDER \"" + parent.toString().strip() + "\".")
+            print ("[WARNING] Changed dependency: \"" + found_node.toString().strip() + "\" --> \"" + child.toString().strip() + "\" UNDER \"" + parent.toString().strip() + "\"")
 
         elif not old_tree.contains_ignore_version(child):
             new_dependency.append(child)
@@ -53,14 +58,12 @@ def find_diff_and_new (children, old_tree, new_dependency):
         find_diff_and_new(child.children, old_tree, new_dependency)
 
 
-def print_new_dependency1(tree, new_dependency):
-    print ("[INFO]-----------------New dependencies found-----------------")
-
+def print_new_dependency(tree, new_dependency):
     for dependency in new_dependency:
         parent = dependency
         while parent.level > 1:
             parent = parent.get_parent()
-        print ("[INFO] New dependency: \"" + dependency.toString().strip() + "\" UNDER \"" + parent.toString().strip() + "\". ")
+        print ("[INFO] New dependency: \"" + dependency.toString().strip() + "\" UNDER \"" + parent.toString().strip() + "\"")
 
 
 def get_pom_base(project_dir, branch = "master", version = None):
