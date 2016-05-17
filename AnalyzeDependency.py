@@ -279,6 +279,9 @@ def main():
 
     if args.addcommon or args.addundeclared or args.exclude:
         pretty_pom(args.pom)
+    else:
+        print ("Failed to run. Please specify at least one optional argument.")
+        print ("Type \"./AnalyzeDependency.py -h\" for more information.")
 
 
 if __name__ == '__main__':
