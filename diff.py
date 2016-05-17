@@ -80,19 +80,17 @@ def get_pom_base(project_dir, branch = "master", version = None):
     proc = subprocess.check_call(["mv", "pom_newversion.xml", "pom.xml"])
 
 
-#TODO: 如果指定branch和version，该如何调用
-#TODO: 查清楚，不同branch下的不同commit，有没有可能具有相同的commitID
 def main():
     parser = argparse.ArgumentParser()
     
-    parser.add_argument("newpompath", help = "the path of pom.xml")
+    parser.add_argument("pom", help = "the path of pom.xml")
 
-    parser.add_argument("-b", "--branch", help = "select a branch. Default branch is master, if version number is not specified")
-    parser.add_argument("-v", "--version", help = "select a version number. This will ignore the branch if it is given")
+    parser.add_argument("-b", "--branch", help = "select a branch. Default branch is master")
+    parser.add_argument("-v", "--version", help = "select a version number. This will ignore the branch even if branch is given")
 
     args = parser.parse_args()
 
-    project_dir = os.path.dirname(args.newpompath)
+    project_dir = os.path.dirname(args.pom)
 
     if args.version:
         get_pom_base(project_dir, version = args.version)
