@@ -139,7 +139,7 @@ def add_used_undeclared_dependency (pom, project_dir):
 
 
 # TODO: 添加参数times，让使用者决定二级依赖节点数在多大规模时需要exclude
-def exclude_heavy_transitive_depency (pom, project_dir):
+def exclude_heavy_transitive_depency (pom, project_dir, exclude_fail):
     if project_dir != "":
         os.chdir(project_dir)
 
@@ -155,8 +155,10 @@ def exclude_heavy_transitive_depency (pom, project_dir):
     for child in tree.root.children: #first level dependency
         for grandchild in child.children: #second level dependency
             children_number = count_children(grandchild) + 1
-            if (children_number >= 5):
-                exclude_dependency(pom, grandchild.get_data(), child.get_data())
+            if children_number >= 5 and not grandchild.get_data() in exclude_fail:
+                exclude_succ = exclude_dependency(pom, project_dir, grandchild.get_data(), child.get_data())
+                if not exclude_succ:
+                    exclude_fail.append(grandchild.get_data())
                 exclude_flag = True
 
     proc = subprocess.check_call(["rm", DEPENDENCY_TREE_FILE])
@@ -171,9 +173,7 @@ def count_children (root):
 
 
 # exclude the child_dependency from root_dependency
-def exclude_dependency (pom, child_dependency, root_dependency):
-    print (child_dependency)
-
+def exclude_dependency (pom, project_dir, child_dependency, root_dependency):
     root_dependency_info = root_dependency.split(":")
     child_dependency_info = child_dependency.split(":")
 
@@ -182,7 +182,7 @@ def exclude_dependency (pom, child_dependency, root_dependency):
     dependencies = root.find("%sdependencies" %(POM_NS))
 
     for dependency in dependencies:
-        flag = 0;
+        flag = 0
         for child in dependency[0: 2]:
             tag = child.tag.replace(POM_NS, "")
             if tag == "groupId" and  child.text == root_dependency_info[0]:
@@ -202,15 +202,35 @@ def exclude_dependency (pom, child_dependency, root_dependency):
         exclusion.text = "\n"
         exclusion.tail = "\n"
 
-        childElement = ET.SubElement(exclusion, "groupId")
-        childElement.text = child_dependency_info[0]
-        childElement.tail = "\n"
+        groupId = ET.SubElement(exclusion, "groupId")
+        groupId.text = child_dependency_info[0]
+        groupId.tail = "\n"
 
-        childElement = ET.SubElement(exclusion, "artifactId")
-        childElement.text = child_dependency_info[1]
-        childElement.tail = "\n"
+        artifactId = ET.SubElement(exclusion, "artifactId")
+        artifactId.text = child_dependency_info[1]
+        artifactId.tail = "\n"
+
+    if project_dir != "":
+        os.chdir(project_dir)
+
+    proc = subprocess.check_call(["cp", "pom.xml", "pom_old.xml"]) #backup pom.xml
 
     tree.write(pom, method = "xml")
+
+    exclude_succ = True
+    try:
+        proc = subprocess.check_call(["mvn", "clean", "compile"], stdout=subprocess.PIPE) 
+    except  subprocess.CalledProcessError: 
+        proc = subprocess.check_call(["rm", "pom.xml"])
+        proc = subprocess.check_call(["cp", "pom_old.xml", "pom.xml"])
+        exclude_succ = False
+    finally:
+        proc = subprocess.check_call(["rm", "pom_old.xml"])
+
+    if exclude_succ:
+        print (child_dependency)
+
+    return exclude_succ
 
 
 def pretty_pom (pom):
@@ -241,8 +261,8 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("pom", help = "the path of pom file")
-    parser.add_argument("-addcommon", help = "add common dependencies", action = "store_true")
     parser.add_argument("-addundeclared", help = " add used and undeclared dependencies", action = "store_true")
+    parser.add_argument("-addcommon", help = "add common dependencies", action = "store_true")
     parser.add_argument("-exclude", help = "exclude heavy transitive dependencies. Please note that this method will remove dependencies and project might doesn't work after removing. Do not use this until you can handle when the project compiles or runs unsuccessfully", action = "store_true")
 
     args = parser.parse_args()
@@ -270,9 +290,10 @@ def main():
     if args.exclude:
         print ("[INFO]----------Excluded Dependencies----------")
 
-        status = exclude_heavy_transitive_depency(args.pom, project_dir)
+        exclude_fail = []
+        status = exclude_heavy_transitive_depency(args.pom, project_dir, exclude_fail)
         while status:
-            status = exclude_heavy_transitive_depency (args.pom, project_dir)
+            status = exclude_heavy_transitive_depency (args.pom, project_dir, exclude_fail)
 
         print ("[INFO]----------------------------------------------------------------------\n")
 
@@ -282,7 +303,7 @@ def main():
     else:
         print ("Failed to run. Please specify at least one optional argument.")
         print ("Type \"./AnalyzeDependency.py -h\" for more information.")
-
+        
 
 if __name__ == '__main__':
     main()

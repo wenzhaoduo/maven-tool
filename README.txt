@@ -88,12 +88,13 @@ AnalyzeDependency.py
 
 (1.2) 添加未声明的依赖
     执行 maven dependency:analyze 找出 used undeclared dependencies (被显示使用但是没有声明的依赖)，并将这些依赖在pom.xml中声明
-    如果 jar A 的里的类 ClassA 在 import 了，maven 就会认为 jar A 是 used undeclared dependency。
+    如果 jar A 的里的类 ClassA 在 import 了，maven 就会认为 jar A 是 used dependency。
     所以要在 IDE 中自动删除没用的 import，避免引入不需要的依赖
 
 (1.3) 排除大的二级依赖
     执行 maven dependency:tree -Dverbose, 遍历依赖树，如果某个2级依赖子树有不低于5个节点，在pom.xml中exclude该依赖
-    这个功能可能会 exclude 有用的dependency，需慎用
+    每一次exclude之后都会执行mvn clean compile，如果compile失败，就不会exclude该依赖
+    这个功能可能会 exclude 运行时需要用的dependency，需慎用
 
 (2) Command Line Arguments
 
