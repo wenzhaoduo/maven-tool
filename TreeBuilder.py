@@ -71,17 +71,17 @@ def main():
     # run some find and contains
     # run some print path on nodes
 
-    dataFile = "dependencyTree.txt"
+    dataFile = "/home/mi/boss-operations/dependencyTree.txt"
     tree = TreeBuilder(dataFile).build()
 
-    # print(tree.toString())
+    print(tree.toString())
 
     raw_node_text = "com.xiaomi.telecom.boss:boss-common:jar:1.0.0-SNAPSHOT:compile"
     # print (tree.find(Node(raw_node_text)))
     found_node = tree.find_contain_omitted(Node(raw_node_text))
 
-    for node in found_node:
-        print (node.build_with_ancestors())
+    # for node in found_node:
+    #     print (node.build_with_ancestors())
     # print (found_node.times)
 
     # print(found_node.toString(False))

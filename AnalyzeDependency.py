@@ -7,6 +7,7 @@ import re
 import sys, os
 import argparse
 from TreeBuilder import TreeBuilder
+from Node import Node
 
 #namespace
 POM_NS = "{http://maven.apache.org/POM/4.0.0}"
@@ -38,19 +39,13 @@ def add_common_dependency (pom, project_dir, common_times):
 def find_common_dependency (pom, root, common_times):
     for child in root.children:
         if child.get_times() >= int(common_times) and child.get_level() > 1: #if a dependency appear more than 5 times, declare it on the pom.xml
-            jar_info = child.get_data().split(":")
-            dependency = jar_info[0] + ":" + jar_info[1] + ":" + jar_info[-2]
-
-            if len(jar_info) == 6: #append classifier tag
-                dependency = dependency + ":" + jar_info[-3]
-
-            add_dependency(pom, dependency)
+            add_dependency(pom, child)
 
         find_common_dependency (pom, child, common_times)
 
 
-def add_dependency (pom, data):
-    print (data)
+def add_dependency (pom, node):
+    print(node.build_with_ancestors())
 
     tree = ET.parse(pom)
     root = tree.getroot()
@@ -60,6 +55,7 @@ def add_dependency (pom, data):
     dependency.tail = "\n"
     dependency.text = "\n"
 
+    data = node.get_data()
     jar_info = data.split(":")
 
     childElement = ET.SubElement(dependency, "groupId")
@@ -71,18 +67,17 @@ def add_dependency (pom, data):
     childElement.tail = "\n"
 
     childElement = ET.SubElement(dependency, "version")
-    childElement.text = jar_info[2]
+    childElement.text = jar_info[-2]
     childElement.tail = "\n"
 
-    if len(jar_info) == 4:
+    if len(jar_info) == 6:
         childElement = ET.SubElement(dependency, "classifier")
-        childElement.text = jar_info[3]
+        childElement.text = jar_info[-3]
         childElement.tail = "\n"
 
     tree.write(pom, method = "xml")
 
 
-# add used and undeclared dependency
 def add_used_undeclared_dependency (pom, project_dir): 
     if project_dir != "":
         os.chdir(project_dir)
@@ -90,52 +85,64 @@ def add_used_undeclared_dependency (pom, project_dir):
     analyze_output = "dependencyAnalyze.txt"
     analyze_pom = open(analyze_output, "w")  #write the result of analyze to this file
     try:
-        proc = subprocess.check_call(["mvn", "clean", "dependency:analyze", "-DoutputXML"], stdout=analyze_pom) 
+        proc = subprocess.check_call(["mvn", "clean", "dependency:analyze"], stdout=analyze_pom) 
+        proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
     except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
         sys.exit ("[ERROR]: An error occurs when analyzing dependencies of project. Please check the pom.xml.")
     finally:
         analyze_pom.close()
 
+    tree = TreeBuilder(DEPENDENCY_TREE_FILE).build()
+    node = ""
+
     analyze_pom = open(analyze_output, "r")
     data = ""
     flag = False
-    data_construct_finished = False
     return_status = False #decide whether calling this function again
     for line in analyze_pom:
-        line = line.strip()
-
-        if line == "<dependency>":
+        if line == "[WARNING] Used undeclared dependencies found:\n":
             flag = True
-            return_status = True
             continue
-        elif line == "</dependency>":
-            flag = False
-            data_construct_finished = True
-        elif line == "</version>":
-            continue
+
+        elif flag and not line.startswith("[WARNING]    "):
+            break
 
         if flag:
-            pattern = re.compile(">[^<]+<")
-            temp = re.findall(pattern, line)
-            elementText = temp[0].strip("<>")
-
-            if data == "":
-                data = data + elementText
-            else:
-                data = data + ":" + elementText
-
-            if len(temp) == 2:
-                elementText = temp[1].strip("<>")
-                data = data + ":" + elementText
-
-        if data_construct_finished:
-            add_dependency(pom, data)
-            data_construct_finished = False
-            data = ""
+            data = line.strip("[WARNING] \n")
+            found_node = tree.root.find(Node(data))
+            add_dependency(pom, found_node)
 
     analyze_pom.close()
-    proc = subprocess.check_call(["rm", "dependencyAnalyze.txt"])
+    proc = subprocess.check_call(["rm", analyze_output, DEPENDENCY_TREE_FILE])
     return return_status
+
+
+def find_heavy_transitive_dependency (pom, project_dir, heavy_times):
+    if project_dir != "":
+        os.chdir(project_dir)
+
+    try:
+        proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
+    except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
+        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the pom.xml.")
+
+    tree = TreeBuilder(DEPENDENCY_TREE_FILE).build()
+
+    for child in tree.root.children: #first level dependency
+        for grandchild in child.children: #second level dependency
+            children_number = count_children(grandchild) + 1
+            if children_number >= int(heavy_times):
+                print (grandchild.get_data())
+
+    proc = subprocess.check_call(["rm", DEPENDENCY_TREE_FILE])
+
+
+def count_children (root):
+    counts = 0
+    for child in root.children:
+        if not child.omitted:
+            counts = counts + 1 + count_children(child)
+    return counts
 
 
 # TODO: 添加参数times，让使用者决定二级依赖节点数在多大规模时需要exclude
@@ -155,7 +162,7 @@ def exclude_heavy_transitive_depency (pom, project_dir, exclude_fail, heavy_time
     for child in tree.root.children: #first level dependency
         for grandchild in child.children: #second level dependency
             children_number = count_children(grandchild) + 1
-            if children_number >= heavy_times and not grandchild.get_data() in exclude_fail:
+            if children_number >= int(heavy_times) and not grandchild.get_data() in exclude_fail:
                 exclude_succ = exclude_dependency(pom, project_dir, grandchild.get_data(), child.get_data())
                 if not exclude_succ:
                     exclude_fail.append(grandchild.get_data())
@@ -163,13 +170,6 @@ def exclude_heavy_transitive_depency (pom, project_dir, exclude_fail, heavy_time
 
     proc = subprocess.check_call(["rm", DEPENDENCY_TREE_FILE])
     return exclude_flag
-
-
-def count_children (root):
-    counts = 0
-    for child in root.children:
-        counts = counts + 1 + count_children(child)
-    return counts
 
 
 # exclude the child_dependency from root_dependency
@@ -263,14 +263,14 @@ def main():
     parser.add_argument("pom", help = "the path of pom file")
     parser.add_argument("-addundeclared", help = " add used and undeclared dependencies", action = "store_true")
     parser.add_argument("-addcommon", help = "add common dependencies")
-    parser.add_argument("-exclude", help = "exclude heavy transitive dependencies. Please note that this method will remove dependencies and project might doesn't work after removing. Do not use this until you can handle when the project compiles or runs unsuccessfully")
+    parser.add_argument("-findheavy", help = "find heavy transitive dependencies.")
 
     args = parser.parse_args()
 
     project_dir = os.path.dirname(args.pom)
 
     if args.addcommon:
-        print ("[INFO]----------Adding commonly used dependencies----------")
+        print ("[INFO]----------Adding commonly used dependencies----------\n")
 
         add_common_dependency(args.pom, project_dir, args.addcommon)
 
@@ -278,7 +278,7 @@ def main():
 
         
     if args.addundeclared:
-        print ("[INFO]----------Adding used undeclared dependencies----------")
+        print ("[INFO]----------Adding used undeclared dependencies----------\n")
 
         status = add_used_undeclared_dependency(args.pom, project_dir)
         while status:
@@ -287,20 +287,22 @@ def main():
         print ("[INFO]----------------------------------------------------------------------\n")
         
 
-    if args.exclude:
-        print ("[INFO]----------Heavy transitive Dependencies----------")
+    if args.findheavy:
+        print ("[INFO]----------Heavy transitive Dependencies----------\n")
 
-        exclude_fail = []
-        status = exclude_heavy_transitive_depency(args.pom, project_dir, exclude_fail, args.exclude)
-        while status:
-            status = exclude_heavy_transitive_depency (args.pom, project_dir, exclude_fail, args.exclude)
+        find_heavy_transitive_dependency(args.pom, project_dir, args.findheavy)
+
+        # exclude_fail = []
+        # status = exclude_heavy_transitive_depency(args.pom, project_dir, exclude_fail, args.exclude)
+        # while status:
+        #     status = exclude_heavy_transitive_depency (args.pom, project_dir, exclude_fail, args.exclude)
 
         print ("[INFO]----------------------------------------------------------------------\n")
 
 
-    if args.addcommon or args.addundeclared or args.exclude:
+    if args.addcommon or args.addundeclared:
         pretty_pom(args.pom)
-    else:
+    if not (args.addcommon or args.addundeclared or args.findheavy):
         print ("Failed to run. Please specify at least one optional argument.")
         print ("Type \"./AnalyzeDependency.py -h\" for more information.")
         

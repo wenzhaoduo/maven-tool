@@ -107,8 +107,9 @@ class Node:
 
     def build_with_children(self):
         result = self.toString()
-        for child in self.children and not child.omitted:
-            result += child.build_with_children()
+        for child in self.children:
+            if not child.omitted:
+                result += child.build_with_children()
         return result
 
     def build_with_ancestors(self):
