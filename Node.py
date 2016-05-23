@@ -1,10 +1,11 @@
 ######### CLASS NODE  ######### 
 
 class Node:
-    def __init__(self, data):
+    def __init__(self, data, omitted = False):
         self.parent = None
         self.level = 0
         self.times = 1
+        self.omitted = omitted #whether this node is omitted
         self.data = data
         self.children = []
         self.groupId = ""
@@ -34,18 +35,21 @@ class Node:
 
     def equals(self, other):
         if self.__class__ == other.__class__:
-            if(self.data == other.data):
+            if self.data == other.data and not self.omitted:
                 return True
         return False
 
-    def contains(self, other):
+    def contains(self, other, ignore_omitted):
         found = False
         if self.__class__ == other.__class__:
             if self.data == other.data:
-                found = True
+                if ignore_omitted:
+                    found = True
+                elif not ignore_omitted and not self.omitted:
+                    found = True
             else:
                 for child in self.children:
-                    found = child.contains(other)
+                    found = child.contains(other, ignore_omitted)
                     if(found == True):
                         break
         return found
@@ -65,7 +69,7 @@ class Node:
     def find(self, other):
         found_flag = None
         if self.__class__ == other.__class__:
-            if self.data == other.data:
+            if self.data == other.data and not self.omitted:
                 found_flag = self
             else:
                 for child in self.children:
@@ -74,10 +78,18 @@ class Node:
                         break
         return found_flag
 
+    def find_contain_omitted(self, other, node_list):
+        if self.__class__ == other.__class__:
+            if self.data == other.data:
+                node_list.append(self)
+
+            for child in self.children:
+                child.find_contain_omitted(other, node_list)
+
     def find_ignore_version(self, other):
         found_flag = None
         if self.__class__ == other.__class__:
-            if self.groupId == other.groupId and self.artifactId == other.artifactId:
+            if not self.omitted and self.groupId == other.groupId and self.artifactId == other.artifactId:
                 found_flag = self
             else:
                 for child in self.children:
@@ -90,18 +102,18 @@ class Node:
         tabs = ""
         for i in range(0, self.level):
             tabs += "  "
-        # return str(self.level)  + "," + str(self.times) + tabs + self.data + '\n'
-        return tabs + self.data + '\n'
+        # return str(self.level)  + "," + str(self.times) + "," + str(self.omitted) + ","+ tabs + self.data + "\n"
+        return tabs + self.data + "\n"
 
     def build_with_children(self):
         result = self.toString()
-        for child in self.children:
+        for child in self.children and not child.omitted:
             result += child.build_with_children()
         return result
 
     def build_with_ancestors(self):
-        result = ''
-        if self.parent is not None:
+        result = ""
+        if self.parent.level > 0:
             result = self.parent.build_with_ancestors()
         return result + self.toString()
 

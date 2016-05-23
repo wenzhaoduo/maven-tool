@@ -10,7 +10,7 @@ class TreeParser:
         f = open(self.data)
         self.root_name = f.readline().strip("\n");
 
-        for line in islice(f, 1, None):
+        for line in islice(f, 0, None):
             nodeList.append(line.strip("\n"))
         f.close()
         return nodeList
