@@ -34,15 +34,19 @@ class TreeBuilder:
 
         parent = self.root
 
-        pattern = re.compile("(?<=\\()(.+?)(?=\\))")
+        error_level = False
+        error_parent = None
 
+        pattern = re.compile("(?<=\\()(.+?)(?=\\))")
         for raw_node in node_list:
             temp = re.findall(pattern, raw_node)
             if len(temp) > 0: # This is an omitted node
                 omitted_node_data = temp[0].split(" - ")[0]
-                child = Node(omitted_node_data, omitted = True)
-                if self.tree.contains(child, ignore_omitted = False):
+                child = Node(omitted_node_data, True)
+                if self.tree.contains(child, True):
                     found_node = self.tree.find(child)
+                    if found_node == None:
+                        print (raw_node)
                     found_node.times = found_node.times + 1
                 elif omitted_node_data in self.omitted_dict:
                     self.omitted_dict[omitted_node_data] = self.omitted_dict[omitted_node_data] + 1
@@ -55,6 +59,15 @@ class TreeBuilder:
                     child.times = self.omitted_dict[child.data] + 1
 
             level = self.compute_level(raw_node)
+            if level == parent.get_level() + 2 and not error_level:
+                error_level = True
+                error_parent = parent
+            elif error_level and error_parent.get_level() >= level:
+                error_level = False
+
+            if error_level:
+                level = level - 1
+
             while(parent.get_level() >= level):
                 parent = parent.get_parent()
 
@@ -66,19 +79,19 @@ class TreeBuilder:
 
 #TODO: print build with ancestors with -->
 def main():
-    # read from dependencies.txt file
-    # parse file into Tree
-    # run some find and contains
-    # run some print path on nodes
 
     dataFile = "/home/mi/boss-operations/dependencyTree.txt"
     tree = TreeBuilder(dataFile).build()
 
-    print(tree.toString())
+    # print(tree.toString())
+    for i in range (0, len(tree.root.children)):
+        print (i)
 
-    raw_node_text = "com.xiaomi.telecom.boss:boss-common:jar:1.0.0-SNAPSHOT:compile"
+    # raw_node_text = "|  |  |        +- org.apache.avro:avro:jar:1.5.3:compile"
+    # raw_node_text = "|  |        +- com.xiaomi.mfs.common:mfs-common:jar:1.2.6:compile"
+    # print (TreeBuilder(dataFile).compute_level(raw_node_text))
     # print (tree.find(Node(raw_node_text)))
-    found_node = tree.find_contain_omitted(Node(raw_node_text))
+    # found_node = tree.find_contain_omitted(Node(raw_node_text))
 
     # for node in found_node:
     #     print (node.build_with_ancestors())

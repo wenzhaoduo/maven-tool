@@ -39,13 +39,13 @@ class Node:
                 return True
         return False
 
-    def contains(self, other, ignore_omitted):
+    def contains(self, other, ignore_omitted): 
         found = False
         if self.__class__ == other.__class__:
             if self.data == other.data:
-                if ignore_omitted:
+                if not ignore_omitted:
                     found = True
-                elif not ignore_omitted and not self.omitted:
+                elif ignore_omitted and not self.omitted:
                     found = True
             else:
                 for child in self.children:
@@ -69,24 +69,27 @@ class Node:
     def find(self, other):
         found_flag = None
         if self.__class__ == other.__class__:
-            if self.data == other.data and not self.omitted:
+            if self.data == other.data:
                 found_flag = self
             else:
                 for child in self.children:
+                    if child.omitted:
+                        continue
                     found_flag = child.find(other)
                     if found_flag != None:
                         break
         return found_flag
 
-    def find_contain_omitted(self, other, node_list):
+    def find_contain_omitted(self, other, node_list): #all dependencies with the same groupId and artifactId as self
         if self.__class__ == other.__class__:
-            if self.data == other.data:
+            if self.groupId == other.groupId and self.artifactId == other.artifactId:
                 node_list.append(self)
 
             for child in self.children:
                 child.find_contain_omitted(other, node_list)
 
-    def find_ignore_version(self, other):
+
+    def find_ignore_version(self, other): #find an dependency with the same groupId and artifactId as self
         found_flag = None
         if self.__class__ == other.__class__:
             if not self.omitted and self.groupId == other.groupId and self.artifactId == other.artifactId:
@@ -98,6 +101,7 @@ class Node:
                         break
         return found_flag
 
+
     def toString(self):
         tabs = ""
         for i in range(0, self.level):
@@ -108,16 +112,30 @@ class Node:
     def build_with_children(self):
         result = self.toString()
         for child in self.children:
-            if not child.omitted:
-                result += child.build_with_children()
+            result += child.build_with_children()
         return result
 
+    # def build_with_ancestors(self):
+    #     result = ""
+    #     if self.parent.level > 0:
+    #         result = self.parent.build_with_ancestors()
+    #     return result + self.toString()
+
     def build_with_ancestors(self):
+        result = self.get_ancestors()
+        ancestors = result.split("\n")
+        result = ancestors[0].strip()
+
+        for i in range(1, len(ancestors) - 1):
+            result = result + " --> " + ancestors[i]
+
+        return result
+
+    def get_ancestors(self):
         result = ""
         if self.parent.level > 0:
-            result = self.parent.build_with_ancestors()
-        return result + self.toString()
-
+            result = self.parent.get_ancestors()
+        return result + self.data + "\n"
 ######### END OF CLASS ######### 
 
 def main():

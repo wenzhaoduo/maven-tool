@@ -5,7 +5,7 @@ class Tree:
         self.root = root
     def getRoot(self):
         return self.root
-    def contains(self, node, ignore_omitted = True):
+    def contains(self, node, ignore_omitted = False):
         return self.root.contains(node, ignore_omitted)
     def contains_ignore_version(self, node):
         return self.root.contains_ignore_version(node)

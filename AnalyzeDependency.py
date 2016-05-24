@@ -233,6 +233,43 @@ def exclude_dependency (pom, project_dir, child_dependency, root_dependency):
     return exclude_succ
 
 
+def find_duplicate_dependency (pom, project_dir):
+    if project_dir != "":
+        os.chdir(project_dir)
+
+    try:
+        proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
+    except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
+        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the pom.xml.")
+
+    tree = TreeBuilder(DEPENDENCY_TREE_FILE).build()
+
+    find_duplicate (tree.root, tree)
+
+def find_duplicate (node, tree):
+    count = 0
+    for child in node.children:
+        count = count + 1
+        if not child.omitted:
+            duplicate_node = tree.find_contain_omitted(child)
+            duplicate_node.remove(child)
+            duplicate_node.append(child)
+
+            if len(duplicate_node) > 1:
+                print_duplicate_node(duplicate_node)
+
+            find_duplicate(child, tree)
+
+def print_duplicate_node(node_list):
+    print ("-------------------------------------------------------")
+    print (node_list[-1].build_with_ancestors())
+    print ("---------------Omitted versions----------------")
+    for i in range(0, len(node_list) - 1):
+        print (node_list[i].build_with_ancestors())
+        # print ("")
+
+
+
 def pretty_pom (pom):
     tree = ET.parse(pom)
     root = tree.getroot()
@@ -261,16 +298,17 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("pom", help = "the path of pom file")
-    parser.add_argument("-addundeclared", help = " add used and undeclared dependencies", action = "store_true")
-    parser.add_argument("-addcommon", help = "add common dependencies")
-    parser.add_argument("-findheavy", help = "find heavy transitive dependencies.")
+    parser.add_argument("-au", "--addundeclared", help = " add used and undeclared dependencies", action = "store_true")
+    parser.add_argument("-ac", "--addcommon", help = "add dependencies appearing more than a given number")
+    parser.add_argument("-fh", "--findheavy", help = "find all heavy transitive dependencies with children more than a given number")
+    parser.add_argument("-fd", "--findduplicate", help = "find all dependencies if they have different versions or they appear more than once", action = "store_true")
 
     args = parser.parse_args()
 
     project_dir = os.path.dirname(args.pom)
 
     if args.addcommon:
-        print ("[INFO]----------Adding commonly used dependencies----------\n")
+        print ("[INFO]----------Adding Commonly Used Dependencies----------\n")
 
         add_common_dependency(args.pom, project_dir, args.addcommon)
 
@@ -278,7 +316,7 @@ def main():
 
         
     if args.addundeclared:
-        print ("[INFO]----------Adding used undeclared dependencies----------\n")
+        print ("[INFO]----------Adding Used Undeclared Dependencies----------\n")
 
         status = add_used_undeclared_dependency(args.pom, project_dir)
         while status:
@@ -288,21 +326,22 @@ def main():
         
 
     if args.findheavy:
-        print ("[INFO]----------Heavy transitive Dependencies----------\n")
+        print ("[INFO]----------Heavy Transitive Dependencies----------\n")
 
         find_heavy_transitive_dependency(args.pom, project_dir, args.findheavy)
 
-        # exclude_fail = []
-        # status = exclude_heavy_transitive_depency(args.pom, project_dir, exclude_fail, args.exclude)
-        # while status:
-        #     status = exclude_heavy_transitive_depency (args.pom, project_dir, exclude_fail, args.exclude)
-
         print ("[INFO]----------------------------------------------------------------------\n")
 
+    if args.findduplicate:
+        print ("[INFO]----------Duplicated Dependencies Found----------\n")
+
+        find_duplicate_dependency(args.pom, project_dir)
+
+        # print ("[INFO]----------------------------------------------------------------------\n")
 
     if args.addcommon or args.addundeclared:
         pretty_pom(args.pom)
-    if not (args.addcommon or args.addundeclared or args.findheavy):
+    if not (args.addcommon or args.addundeclared or args.findheavy or args.findduplicate):
         print ("Failed to run. Please specify at least one optional argument.")
         print ("Type \"./AnalyzeDependency.py -h\" for more information.")
         
