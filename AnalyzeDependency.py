@@ -343,7 +343,7 @@ def main():
         pretty_pom(args.pom)
     if not (args.addcommon or args.addundeclared or args.findheavy or args.findduplicate):
         print ("Failed to run. Please specify at least one optional argument.")
-        print ("Type \"./AnalyzeDependency.py -h\" for more information.")
+        print ("Type \"./AnalyzeDependency.py -h\" for details.")
         
 
 if __name__ == '__main__':

@@ -158,7 +158,9 @@ def main():
     if args.findjar:
         get_all_classes(args.pom, project_dir, args.findjar)
 
-
+    if  not (args.duplicateclass or args.findjar):
+        print ("Failed to run. Please specify at least one optional argument.")
+        print ("Type \"./TraverseJar.py -h\" for details.")
 
 if __name__ == '__main__':
     main()
