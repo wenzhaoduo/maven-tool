@@ -18,9 +18,8 @@ DEPENDENCY_TREE_FILE = "dependencyTree.txt"
 MODIFIED_DEPENDENCY_FILE = "modifiedDependency.txt"
 
 
-# add the dependencies used commonly
-# TODO: 添加参数times，让使用者决定出现多少次以上需要提到一级依赖
-def add_common_dependency (pom, project_dir, common_times):
+# find the dependencies used commonly
+def find_common_dependency (pom, project_dir, common_times):
     if project_dir != "":
         os.chdir(project_dir)
 
@@ -31,17 +30,18 @@ def add_common_dependency (pom, project_dir, common_times):
 
     tree = TreeBuilder(DEPENDENCY_TREE_FILE).build()
 
-    find_common_dependency (pom, tree.root, common_times)
+    find_common (pom, tree.root, common_times)
 
     proc = subprocess.check_call(["rm", DEPENDENCY_TREE_FILE])
 
 
-def find_common_dependency (pom, root, common_times):
+def find_common (pom, root, common_times):
     for child in root.children:
-        if child.get_times() >= int(common_times) and child.get_level() > 1: #if a dependency appear more than 5 times, declare it on the pom.xml
-            add_dependency(pom, child)
+        if child.get_times() >= int(common_times) and child.get_level() > 1: #if a dependency appear frequently more than common_times, declare it in the pom.xml
+            # add_dependency(pom, child)
+            print(child.build_with_ancestors())
 
-        find_common_dependency (pom, child, common_times)
+        find_common (pom, child, common_times)
 
 
 def add_dependency (pom, node):
@@ -145,94 +145,6 @@ def count_children (root):
     return counts
 
 
-# TODO: 添加参数times，让使用者决定二级依赖节点数在多大规模时需要exclude
-def exclude_heavy_transitive_depency (pom, project_dir, exclude_fail, heavy_times):
-    if project_dir != "":
-        os.chdir(project_dir)
-
-    try:
-        proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
-    except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
-        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the pom.xml.")
-
-    tree = TreeBuilder(DEPENDENCY_TREE_FILE).build()
-
-    # if a transitive dependency has more than 5 children, exclude it.
-    exclude_flag = False;
-    for child in tree.root.children: #first level dependency
-        for grandchild in child.children: #second level dependency
-            children_number = count_children(grandchild) + 1
-            if children_number >= int(heavy_times) and not grandchild.get_data() in exclude_fail:
-                exclude_succ = exclude_dependency(pom, project_dir, grandchild.get_data(), child.get_data())
-                if not exclude_succ:
-                    exclude_fail.append(grandchild.get_data())
-                exclude_flag = True
-
-    proc = subprocess.check_call(["rm", DEPENDENCY_TREE_FILE])
-    return exclude_flag
-
-
-# exclude the child_dependency from root_dependency
-def exclude_dependency (pom, project_dir, child_dependency, root_dependency):
-    root_dependency_info = root_dependency.split(":")
-    child_dependency_info = child_dependency.split(":")
-
-    tree = ET.parse(pom)
-    root = tree.getroot()
-    dependencies = root.find("%sdependencies" %(POM_NS))
-
-    for dependency in dependencies:
-        flag = 0
-        for child in dependency[0: 2]:
-            tag = child.tag.replace(POM_NS, "")
-            if tag == "groupId" and  child.text == root_dependency_info[0]:
-                flag = flag + 1
-            elif tag == "artifactId" and child.text == root_dependency_info[1]:
-                flag = flag + 1
-
-        if flag != 2:
-            continue
-
-        exclusions = dependency.find("%sexclusions" %(POM_NS))
-        if exclusions == None:
-            exclusions = ET.Element("exclusions")
-            dependency.insert(3, exclusions)
-
-        exclusion = ET.SubElement(exclusions, "exclusion")
-        exclusion.text = "\n"
-        exclusion.tail = "\n"
-
-        groupId = ET.SubElement(exclusion, "groupId")
-        groupId.text = child_dependency_info[0]
-        groupId.tail = "\n"
-
-        artifactId = ET.SubElement(exclusion, "artifactId")
-        artifactId.text = child_dependency_info[1]
-        artifactId.tail = "\n"
-
-    if project_dir != "":
-        os.chdir(project_dir)
-
-    proc = subprocess.check_call(["cp", "pom.xml", "pom_old.xml"]) #backup pom.xml
-
-    tree.write(pom, method = "xml")
-
-    exclude_succ = True
-    try:
-        proc = subprocess.check_call(["mvn", "clean", "compile"], stdout=subprocess.PIPE) 
-    except  subprocess.CalledProcessError: 
-        proc = subprocess.check_call(["rm", "pom.xml"])
-        proc = subprocess.check_call(["cp", "pom_old.xml", "pom.xml"])
-        exclude_succ = False
-    finally:
-        proc = subprocess.check_call(["rm", "pom_old.xml"])
-
-    if exclude_succ:
-        print (child_dependency)
-
-    return exclude_succ
-
-
 def find_duplicate_dependency (pom, project_dir):
     if project_dir != "":
         os.chdir(project_dir)
@@ -266,7 +178,6 @@ def print_duplicate_node(node_list):
     print ("---------------Omitted versions----------------")
     for i in range(0, len(node_list) - 1):
         print (node_list[i].build_with_ancestors())
-        # print ("")
 
 
 
@@ -299,18 +210,19 @@ def main():
 
     parser.add_argument("pom", help = "the path of pom file")
     parser.add_argument("-au", "--addundeclared", help = " add used and undeclared dependencies", action = "store_true")
-    parser.add_argument("-ac", "--addcommon", help = "add dependencies appearing more than a given number")
+    parser.add_argument("-fd", "--findduplicate", help = "find all dependencies if they have different versions or they repeat the same version", action = "store_true")
+    parser.add_argument("-fc", "--findcommon", help = "find all dependencies appearing frequently more than a given number")
     parser.add_argument("-fh", "--findheavy", help = "find all heavy transitive dependencies with children more than a given number")
-    parser.add_argument("-fd", "--findduplicate", help = "find all dependencies if they have different versions or they appear more than once", action = "store_true")
+
 
     args = parser.parse_args()
 
     project_dir = os.path.dirname(args.pom)
 
-    if args.addcommon:
-        print ("[INFO]----------Adding Commonly Used Dependencies----------\n")
+    if args.findcommon:
+        print ("[INFO]----------Commonly Used Dependencies Found----------\n")
 
-        add_common_dependency(args.pom, project_dir, args.addcommon)
+        find_common_dependency(args.pom, project_dir, args.findcommon)
 
         print ("[INFO]----------------------------------------------------------------------\n")
 
@@ -326,7 +238,7 @@ def main():
         
 
     if args.findheavy:
-        print ("[INFO]----------Heavy Transitive Dependencies----------\n")
+        print ("[INFO]----------Heavy Level 2 Dependencies Found----------\n")
 
         find_heavy_transitive_dependency(args.pom, project_dir, args.findheavy)
 
@@ -339,9 +251,9 @@ def main():
 
         # print ("[INFO]----------------------------------------------------------------------\n")
 
-    if args.addcommon or args.addundeclared:
+    if args.addundeclared:
         pretty_pom(args.pom)
-    if not (args.addcommon or args.addundeclared or args.findheavy or args.findduplicate):
+    if not (args.findcommon or args.addundeclared or args.findheavy or args.findduplicate):
         print ("Failed to run. Please specify at least one optional argument.")
         print ("Type \"./AnalyzeDependency.py -h\" for details.")
         

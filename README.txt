@@ -81,55 +81,92 @@ AnalyzeDependency.py
 
 (1) Strategy
 
-主要有3个方法，可分开调用，每次指定调用至少一个方法。每个方法都可能改变pom.xml，同时会删除pom.xml的所有注释
+主要有4个方法，可分开调用，每次指定调用至少一个方法。
 
-(1.1) 添加常用的传递依赖
-    执行 maven dependency:tree -Dverbose, 遍历依赖树，如果某个依赖出现次数不低于5次，将在pom.xml中声明该依赖
+(1.1) 找出常用的传递依赖
+    执行 mvn dependency:tree -Dverbose, 遍历依赖树，如果某个依赖出现次数不低于给定的一个值，则输出该依赖及其依赖路径
 
 (1.2) 添加未声明的依赖
-    执行 maven dependency:analyze 找出 used undeclared dependencies (被显示使用但是没有声明的依赖)，并将这些依赖在pom.xml中声明
-    如果 jar A 的里的类 ClassA 在 import 了，maven 就会认为 jar A 是 used dependency。
+    执行 mvn dependency:analyze 找出 used undeclared dependencies (被显示使用但是没有声明的依赖)，并将这些依赖在pom.xml中声明。此方法会改变pom.xml，同时会删除pom.xml的所有注释
+    如果 jar A 的里的类 ClassA 被 import 了，maven 就会认为 jar A 是 used dependency。
     所以要在 IDE 中自动删除没用的 import，避免引入不需要的依赖
 
-(1.3) 排除大的二级依赖
-    执行 maven dependency:tree -Dverbose, 遍历依赖树，如果某个2级依赖子树有不低于5个节点，在pom.xml中exclude该依赖
-    每一次exclude之后都会执行mvn clean compile，如果compile失败，就不会exclude该依赖
-    这个功能可能会 exclude 运行时需要用的dependency，需慎用
+(1.3) 找出大的二级依赖
+    执行 mvn dependency:tree -Dverbose, 遍历依赖树，如果某个2级依赖子树包含的节点不低于给定值，将输出该二级依赖
+
+(1.4) 找出有重复版本或者有版本冲突的依赖
+    执行 mvn dependency:tree -Dverbose, 遍历依赖树，找出有重复版本或者有版本冲突的依赖，输出打包时选择的依赖以及被忽略的依赖，以及他们的传递路径
 
 (2) Command Line Arguments
 
-usage: AnalyzeDependency.py [-h] [-addcommon] [-addundeclared] [-exclude] path
+usage: AnalyzeDependency.py [-h] [-au] [-fd] [-fc FINDCOMMON] [-fh FINDHEAVY] pom
 
 positional arguments:
-  pom			the path of pom file
+  pom                   the path of pom file
 
 optional arguments:
-  -h, --help		show this help message and exit
-  -addcommon		add common dependencies
-  -addundeclared	add used and undeclared dependencies
-  -exclude		exclude heavy transitive dependencies
+  -h, --help            show this help message and exit
+  -fc FINDCOMMON, --findcommon FINDCOMMON #(1.1)
+                       find all dependencies appearing more than a given number
+ -au, --addundeclared #(1.2)
+                       add used and undeclared dependencies
+ -fh FINDHEAVY, --findheavy FINDHEAVY #(1.3)
+                       find all heavy transitive dependencies with children
+                       more than a given number
+ -fd, --findduplicate  #(1.4)
+                       find all dependencies if they have different versions
+                       or they appear more than oncef
+
+
 
 (3) Example
 
-分别添加常用的依赖(1.1)，添加未声明的依赖(1.2)，排除大的二级依赖(1.3)
-./AnalyzeDependency.py ~/boss-operations/pom.xml -addcommon -addundeclared -exclude
+(3.1) 找出常用的依赖(1.1)
+./AnalyzeDependency.py ~/boss-operations/pom.xml -fc 5
 
-(4) Output Example
-
-[INFO]----------Commonly used dependencies----------
-org.apache.maven:maven-artifact:2.0.6
+[INFO]----------Commonly used dependencies Found----------
+com.xiaomi.telecom.boss:boss-common:jar:1.0.0-SNAPSHOT:compile --> log4j:log4j:jar:1.2.14:compile
 [INFO]----------------------------------------------------------------------
+依赖“log4j:log4j:jar:1.2.14:compile”至少出现了5次
 
-[INFO]----------Used undeclared dependencies----------
-org.testng:testng:6.8.5
-[INFO]----------------------------------------------------------------------
+(3.2) 添加未声明的依赖(1.2)
+./AnalyzeDependency.py ~/boss-operations/pom.xml -au
 
-[INFO]----------Excluded Dependencies----------
-com.xiaomi:miliao-common:jar:2.0.1:compile
+[INFO]----------Adding Used undeclared dependencies----------
+com.xiaomi.telecom.boss:boss-common:jar:1.0.0-SNAPSHOT:compile --> com.xiaomi:miuicloud-common:jar:1.0-SNAPSHOT:compile --> com.ning:async-http-client:jar:1.7.14:compile
 [INFO]----------------------------------------------------------------------
+把依赖“com.ning:async-http-client:jar:1.7.14:compile”在pom.xml中声明
+
+(3.3) 找出大的二级依赖(1.3)
+./AnalyzeDependency.py ~/boss-operations/pom.xml -fh 5
+
+[INFO]----------Heavy Level 2 Dependencies Found----------
+com.xiaomi:miuicloud-common:jar:1.0-SNAPSHOT:compile
+[INFO]----------------------------------------------------------------------
+二级依赖“com.xiaomi:miuicloud-common:jar:1.0-SNAPSHOT:compile”至少有5个孩子节点
+
+(3.4) 找出有重复版本或者有版本冲突的依赖
+./AnalyzeDependency.py ~/boss-operations/pom.xml -fd
+
+[INFO]----------Duplicated Dependencies Found----------
+com.xiaomi:xiaomi-common-logger:jar:2.6.26:compile --> org.apache.thrift:thrift:jar:0.5.0-fix-thrift1190:compile  
+---------------Omitted versions----------------  #被忽略的版本及依赖路径
+com.xiaomi.telecom.cdr:cdr-common:jar:0.0.1-SNAPSHOT:compile --> com.xiaomi:xiaomi-common-thrift:jar:2.5.6:compile --> com.xiaomi:xiaomi-thrift-shared:jar:2.0.3:compile --> org.apache.thrift:thrift:jar:0.5.0:compile
+----------------------------------------------------------------------
+[INFO]----------------------------------------------------------------------
+打包选择的版本为“org.apache.thrift:thrift:jar:0.5.0-fix-thrift1190:compile”，被忽略的为“org.apache.thrift:thrift:jar:0.5.0:compile”
+
 
 
 -------------------------------------------------------------------------
 TreeBuilder.py / Node.py / Tree.py / TreeParser.py
 -------------------------------------------------------------------------
 解析 mvn dependency:tree 输出的txt文本，并生成一棵依赖树
+
+
+-----------------------------------
+TraverseJar.py
+-----------------------------------
+
+(1) Strategy
+

@@ -10,7 +10,7 @@ import zipfile
 from TreeBuilder import TreeBuilder
 from Node import Node
 
-#TODO: 不需要输入完整路径，只需要输入类名，就可以找到所有的jar包，并输出依赖关系
+
 def get_all_classes (pom, project_dir = "", class_name = ""):
     if project_dir != "":
         os.chdir(project_dir)
