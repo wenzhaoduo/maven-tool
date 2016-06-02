@@ -81,21 +81,17 @@ AnalyzeDependency.py
 
 (1) Strategy
 
-主要有4个方法，可分开调用，每次指定调用至少一个方法。
-
 (1.1) 找出常用的传递依赖
-    执行 mvn dependency:tree -Dverbose, 遍历依赖树，如果某个依赖出现次数不低于给定的一个值，则输出该依赖及其依赖路径
+    执行 mvn clean dependency:tree -Dverbose, 遍历依赖树，如果某个依赖出现次数不低于给定的一个值，则输出该依赖及其依赖路径
 
 (1.2) 添加未声明的依赖
-    执行 mvn dependency:analyze 找出 used undeclared dependencies (被显示使用但是没有声明的依赖)，并将这些依赖在pom.xml中声明。此方法会改变pom.xml，同时会删除pom.xml的所有注释
+    执行 mvn clean dependency:analyze 找出 used undeclared dependencies (被显示使用但是没有声明的依赖)，并将这些依赖在pom.xml中声明。此方法会改变pom.xml，同时会删除pom.xml的所有注释
     如果 jar A 的里的类 ClassA 被 import 了，maven 就会认为 jar A 是 used dependency。
     所以要在 IDE 中自动删除没用的 import，避免引入不需要的依赖
 
 (1.3) 找出大的二级依赖
-    执行 mvn dependency:tree -Dverbose, 遍历依赖树，如果某个2级依赖子树包含的节点不低于给定值，将输出该二级依赖
+    执行 mvn clean dependency:tree -Dverbose, 遍历依赖树，如果某个2级依赖子树包含的节点不低于给定值，将输出该二级依赖
 
-(1.4) 找出有重复版本或者有版本冲突的依赖
-    执行 mvn dependency:tree -Dverbose, 遍历依赖树，找出有重复版本或者有版本冲突的依赖，输出打包时选择的依赖以及被忽略的依赖，以及他们的传递路径
 
 (2) Command Line Arguments
 
@@ -122,46 +118,32 @@ optional arguments:
 (3) Example
 
 (3.1) 找出常用的依赖(1.1)
-./AnalyzeDependency.py ~/boss-operations/pom.xml -fc 5
+    ./AnalyzeDependency.py ~/boss-operations/pom.xml -fc 5
 
-[INFO]----------Commonly used dependencies Found----------
-com.xiaomi.telecom.boss:boss-common:jar:1.0.0-SNAPSHOT:compile --> log4j:log4j:jar:1.2.14:compile
-[INFO]----------------------------------------------------------------------
-依赖“log4j:log4j:jar:1.2.14:compile”至少出现了5次
+    Output:
+    [INFO]----------Commonly used dependencies Found----------
+    com.xiaomi.telecom.boss:boss-common:jar:1.0.0-SNAPSHOT:compile --> log4j:log4j:jar:1.2.14:compile
+    [INFO]----------------------------------------------------------------------
+    依赖“log4j:log4j:jar:1.2.14:compile”至少出现了5次
 
 (3.2) 添加未声明的依赖(1.2)
-./AnalyzeDependency.py ~/boss-operations/pom.xml -au
+    ./AnalyzeDependency.py ~/boss-operations/pom.xml -au
 
-[INFO]----------Adding Used undeclared dependencies----------
-com.xiaomi.telecom.boss:boss-common:jar:1.0.0-SNAPSHOT:compile --> com.xiaomi:miuicloud-common:jar:1.0-SNAPSHOT:compile --> com.ning:async-http-client:jar:1.7.14:compile
-[INFO]----------------------------------------------------------------------
-把依赖“com.ning:async-http-client:jar:1.7.14:compile”在pom.xml中声明
+    Output:
+    [INFO]----------Adding Used undeclared dependencies----------
+    com.xiaomi.telecom.boss:boss-common:jar:1.0.0-SNAPSHOT:compile --> com.xiaomi:miuicloud-common:jar:1.0-SNAPSHOT:compile --> com.ning:async-http-client:jar:1.7.14:compile
+    [INFO]----------------------------------------------------------------------
+    把依赖“com.ning:async-http-client:jar:1.7.14:compile”在pom.xml中声明
 
 (3.3) 找出大的二级依赖(1.3)
-./AnalyzeDependency.py ~/boss-operations/pom.xml -fh 5
+    ./AnalyzeDependency.py ~/boss-operations/pom.xml -fh 5
 
-[INFO]----------Heavy Level 2 Dependencies Found----------
-com.xiaomi:miuicloud-common:jar:1.0-SNAPSHOT:compile
-[INFO]----------------------------------------------------------------------
-二级依赖“com.xiaomi:miuicloud-common:jar:1.0-SNAPSHOT:compile”至少有5个孩子节点
+    Output:
+    [INFO]----------Heavy Level 2 Dependencies Found----------
+    com.xiaomi:miuicloud-common:jar:1.0-SNAPSHOT:compile
+    [INFO]----------------------------------------------------------------------
+    二级依赖“com.xiaomi:miuicloud-common:jar:1.0-SNAPSHOT:compile”至少有5个孩子节点
 
-(3.4) 找出有重复版本或者有版本冲突的依赖
-./AnalyzeDependency.py ~/boss-operations/pom.xml -fd
-
-[INFO]----------Duplicated Dependencies Found----------
-com.xiaomi:xiaomi-common-logger:jar:2.6.26:compile --> org.apache.thrift:thrift:jar:0.5.0-fix-thrift1190:compile  
----------------Omitted versions----------------  #被忽略的版本及依赖路径
-com.xiaomi.telecom.cdr:cdr-common:jar:0.0.1-SNAPSHOT:compile --> com.xiaomi:xiaomi-common-thrift:jar:2.5.6:compile --> com.xiaomi:xiaomi-thrift-shared:jar:2.0.3:compile --> org.apache.thrift:thrift:jar:0.5.0:compile
-----------------------------------------------------------------------
-[INFO]----------------------------------------------------------------------
-打包选择的版本为“org.apache.thrift:thrift:jar:0.5.0-fix-thrift1190:compile”，被忽略的为“org.apache.thrift:thrift:jar:0.5.0:compile”
-
-
-
--------------------------------------------------------------------------
-TreeBuilder.py / Node.py / Tree.py / TreeParser.py
--------------------------------------------------------------------------
-解析 mvn dependency:tree 输出的txt文本，并生成一棵依赖树
 
 
 -----------------------------------
@@ -170,3 +152,81 @@ TraverseJar.py
 
 (1) Strategy
 
+(1.1) 找出重复的类 
+    执行 mvn clean dependency:tree，遍历依赖树上所有的jar包，找出重复的类。
+
+(1.2) 根据类名找jar包
+    执行 mvn clean dependency:tree，遍历依赖树上所有的jar包，若jar包包含该类，则输出该jar包。
+    (1.1)和(1.2)都只扫描本地仓库的jar包，忽略掉jdk和scope为system的jar包。
+
+(1.3) 找出有重复版本或者有版本冲突的依赖
+    执行 mvn clean dependency:tree -Dverbose, 遍历依赖树，找出有重复版本或者有版本冲突的依赖，输出打包时选择的依赖以及被忽略的依赖，以及他们的传递路径。
+
+
+(2) Command Line Arguments
+
+usage: TraverseJar.py [-h] [-dc] [-dj] [-fj FINDJAR] pom
+
+positional arguments:
+  pom                   the path of pom file
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -dc, --duplicateclass  #(1.1)
+                        find all found duplicate classes
+  -fj FINDJAR, --findjar FINDJAR  #(1.2)
+                        given a class name, find all jars containing it
+  -dj, --duplicatejar  #(1.3)
+                        find all jars if they have different versions or they
+                        repeat the same version
+
+
+(3) Example
+
+(3.1) 找出重复的类 (1.1)
+    ./TraverseJar.py ~/boss-operations/pom.xml -dc
+
+    Output:
+    "org/springframework/web/context/request/RequestContextListener.class" found in ['spring-2.5.6.SEC01.jar', 'spring-web-2.5.6.SEC01.jar']
+
+(3.2) 根据类名找jar包 (1.2)
+给定的类名可以带包名，也可以不带包名，两种情况的输出结果可能不同。
+
+(3.2.1) 类不带包名
+    ./TraverseJar.py ~/boss-operations/pom.xml -fj RequestContextListener.class
+
+    Output:
+    "RequestContextListener.class" found in ['spring-2.5.6.SEC01.jar', 'spring-web-2.5.6.SEC01.jar']
+    com.xiaomi.miliao:miliao-serviceapi:jar:1.0.8:compile --> org.springframework:spring:jar:2.5.6.SEC01:compile
+    com.xiaomi.miliao:miliao-serviceapi:jar:1.0.8:compile --> org.springframework:spring-webmvc:jar:2.5.6.SEC01:compile --> org.springframework:spring-web:jar:2.5.6.SEC01:compile
+
+(3.2.2) 类带了包名 (1.3)
+    ./TraverseJar.py ~/boss-operations/pom.xml -fj org/springframework/web/context/request/RequestContextListener.class
+
+    Output:
+    "org/springframework/web/context/request/RequestContextListener.class" found in ['spring-2.5.6.SEC01.jar', 'spring-web-2.5.6.SEC01.jar']
+    com.xiaomi.miliao:miliao-serviceapi:jar:1.0.8:compile --> org.springframework:spring:jar:2.5.6.SEC01:compile
+    com.xiaomi.miliao:miliao-serviceapi:jar:1.0.8:compile --> org.springframework:spring-webmvc:jar:2.5.6.SEC01:compile --> org.springframework:spring-web:jar:2.5.6.SEC01:compile
+
+(3.3) 找出有重复版本或者有版本冲突的依赖
+    ./TraverseJar.py ~/boss-operations/pom.xml -fd
+
+    Output:
+    [INFO]----------Duplicated Jars Found----------
+    com.xiaomi:xiaomi-common-logger:jar:2.6.26:compile --> org.apache.thrift:thrift:jar:0.5.0-fix-thrift1190:compile  
+    ---------------Omitted versions---------------- 
+    com.xiaomi.telecom.cdr:cdr-common:jar:0.0.1-SNAPSHOT:compile --> com.xiaomi:xiaomi-common-thrift:jar:2.5.6:compile --> com.xiaomi:xiaomi-thrift-shared:jar:2.0.3:compile --> org.apache.thrift:thrift:jar:0.5.0:compile
+    ----------------------------------------------------------------------
+    [INFO]----------------------------------------------------------------------
+
+    打包选择的版本为“org.apache.thrift:thrift:jar:0.5.0-fix-thrift1190:compile”，被忽略的为“org.apache.thrift:thrift:jar:0.5.0:compile”
+
+
+
+
+
+
+-------------------------------------------------------------------------
+TreeBuilder.py / Node.py / Tree.py / TreeParser.py
+-------------------------------------------------------------------------
+解析 mvn dependency:tree 输出的txt文本，并生成一棵依赖树

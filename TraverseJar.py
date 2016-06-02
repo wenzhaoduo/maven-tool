@@ -140,13 +140,51 @@ def find_jar (class_name, classes_jar_dict, jar_dependency_dict, tree, full_path
     print ("")
 
 
+def find_duplicate_dependency (pom, project_dir):
+    if project_dir != "":
+        os.chdir(project_dir)
+
+    try:
+        proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
+    except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
+        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the pom.xml.")
+
+    tree = TreeBuilder("dependencyTree.txt").build()
+    proc = subprocess.check_call(["rm", "dependencyTree.txt"])
+
+    find_duplicate (tree.root, tree)
+
+
+def find_duplicate (node, tree):
+    count = 0
+    for child in node.children:
+        count = count + 1
+        if not child.omitted:
+            duplicate_node = tree.find_contain_omitted(child)
+            duplicate_node.remove(child)
+            duplicate_node.append(child)
+
+            if len(duplicate_node) > 1:
+                print_duplicate_node(duplicate_node)
+
+            find_duplicate(child, tree)
+
+def print_duplicate_node(node_list):
+    print ("-------------------------------------------------------")
+    print (node_list[-1].build_with_ancestors())
+    print ("---------------Omitted versions----------------")
+    for i in range(0, len(node_list) - 1):
+        print (node_list[i].build_with_ancestors())
+    print ("")
+
 
 def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("pom", help = "the path of pom file")
-    parser.add_argument("-dc", "--duplicateclass", help = " show all found duplicate classes", action = "store_true")
-    parser.add_argument("-fj", "--findjar", help = "given a class name, find all jars containing it")
+    parser.add_argument("-dc", "--duplicateclass", help = " find all found duplicate classes", action = "store_true")
+    parser.add_argument("-fj", "--findjar", help = "find all jars containing a given class name")
+    parser.add_argument("-dj", "--duplicatejar", help = "find all jars if they have different versions or they repeat the same version", action = "store_true")
 
     args = parser.parse_args()
 
@@ -158,7 +196,15 @@ def main():
     if args.findjar:
         get_all_classes(args.pom, project_dir, args.findjar)
 
-    if  not (args.duplicateclass or args.findjar):
+    if args.duplicatejar:
+        print ("[INFO]----------Duplicated Jars Found----------\n")
+
+        find_duplicate_dependency(args.pom, project_dir)
+
+        print ("-------------------------------------------------------")
+
+
+    if  not (args.duplicateclass or args.findjar or args.duplicatejar):
         print ("Failed to run. Please specify at least one optional argument.")
         print ("Type \"./TraverseJar.py -h\" for details.")
 
