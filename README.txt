@@ -3,21 +3,22 @@ Principles Of Dependency Tree
 ---------------------------------------------
 
 (1) 根节点作为0级依赖
-(2) 构建依赖树的时候，忽略掉omitted dependencies
-(3) 如果两个依赖版本不同，则认为是不同的依赖
-(4) 除了0级依赖 (根节点) 和一级依赖 (pom中声明的依赖)，其他都认为是传递依赖
+(2) 如果两个依赖版本不同，则认为是不同的依赖
+(3) 除了0级依赖 (根节点) 和一级依赖 (pom中声明的依赖)，其他都认为是传递依赖
 
 
 -----------
 diff.py
 -----------
 
+此程序可以判断当添加某一个依赖后，新添加的依赖引入的依赖有哪些，以及整个项目是否有依赖的版本发生了改变。
+
 (1) Strategy
 
 step1
 根据调用时传入的参数 branch 或者 version，从 git.n.xiaomi.com 上选择一个 pom.xml 作为基准
 如果同时指定 branch 和 version，仅考虑 version 所对应的pom.xml
-如果没有指定 branch，则默认是 master 上最新的 pom.xml
+如果没有指定 branch，则默认是 master 上最新的 pom.xml（可能有其他开发者有新的push），因此建议指定版本
 
 git fetch origin <branch> or <commitID> //下载所有的change
 git checkout FETCH_HEAD -- pom.xml //将change应用到pom.xml
@@ -58,21 +59,21 @@ optional arguments:
 来自 git.n.xiaomi.com:xiaomi-telecom/boss-operations
  * branch            maven-dev  -> FETCH_HEAD
 [INFO]-----------------Version changed dependencies-----------------
-[WARNING] Changed dependency: "org.codehaus.plexus:plexus-utils:jar:2.0.5:compile" --> "org.codehaus.plexus:plexus-utils:jar:1.4.1:compile" UNDER "org.apache.maven:maven-artifact:jar:2.0.6:compile"
+[WARNING] Changed dependency: "org.codehaus.plexus:plexus-utils:2.0.5" --> "org.codehaus.plexus:plexus-utils:1.4.1" UNDER "org.apache.maven:maven-artifact:2.0.6"
 [INFO]-----------------------------------------------------------------------------
 
 [INFO]-----------------New dependencies-----------------
-[INFO] New dependency: "com.xiaomi.infra:scribe-log4j:jar:1.0.0-SNAPSHOT:compile" UNDER "org.apache.hbase:hbase:jar:0.94.11-mdh1.2.5:compile"
+[INFO] New dependency: "com.xiaomi.infra:scribe-log4j:1.0.0-SNAPSHOT" UNDER "org.apache.hbase:hbase:0.94.11-mdh1.2.5"
 [INFO]-----------------------------------------------------------------------------
 
  * branch            maven-dev  -> FETCH_HEAD
  表示将采用 maven-dev 分支下最新的 pom.xml 作为比较基准
 
-Changed dependency: "commons-digester:commons-digester:jar:1.8:compile" --> "commons-digester:commons-digester:jar:1.6:compile" 
-表示依赖 "commons-digester:commons-digester:jar:1.8:compile" 有新版本 "commons-digester:commons-digester:jar:1.6:compile"
+Changed dependency: "commons-digester:commons-digester:1.8" --> "commons-digester:commons-digester:1.6" 
+表示依赖 "commons-digester:commons-digester:1.8" 有新版本 "commons-digester:commons-digester:1.6"
 
-UNDER "com.xiaomi:xiaomi-common-logger:jar:2.6.26:compile"
-表示在一级依赖 "com.xiaomi:xiaomi-common-logger:jar:2.6.26:compile" 下
+UNDER "com.xiaomi:xiaomi-common-logger:2.6.26"
+表示在一级依赖 "com.xiaomi:xiaomi-common-logger:2.6.26" 下
 
 
 -----------------------------------
@@ -122,27 +123,27 @@ optional arguments:
 
     Output:
     [INFO]----------Commonly used dependencies Found----------
-    com.xiaomi.telecom.boss:boss-common:jar:1.0.0-SNAPSHOT:compile --> log4j:log4j:jar:1.2.14:compile
+    com.xiaomi.telecom.boss:boss-common:1.0.0-SNAPSHOT --> log4j:log4j:1.2.14
     [INFO]----------------------------------------------------------------------
-    依赖“log4j:log4j:jar:1.2.14:compile”至少出现了5次
+    依赖“log4j:log4j:1.2.14”至少出现了5次
 
 (3.2) 添加未声明的依赖(1.2)
     ./AnalyzeDependency.py ~/boss-operations/pom.xml -au
 
     Output:
     [INFO]----------Adding Used undeclared dependencies----------
-    com.xiaomi.telecom.boss:boss-common:jar:1.0.0-SNAPSHOT:compile --> com.xiaomi:miuicloud-common:jar:1.0-SNAPSHOT:compile --> com.ning:async-http-client:jar:1.7.14:compile
+    com.xiaomi.telecom.boss:boss-common:1.0.0-SNAPSHOT --> com.xiaomi:miuicloud-common:1.0-SNAPSHOT --> com.ning:async-http-client:1.7.14
     [INFO]----------------------------------------------------------------------
-    把依赖“com.ning:async-http-client:jar:1.7.14:compile”在pom.xml中声明
+    把依赖“com.ning:async-http-client:1.7.14”在pom.xml中声明
 
 (3.3) 找出大的二级依赖(1.3)
     ./AnalyzeDependency.py ~/boss-operations/pom.xml -fh 5
 
     Output:
     [INFO]----------Heavy Level 2 Dependencies Found----------
-    com.xiaomi:miuicloud-common:jar:1.0-SNAPSHOT:compile
+    com.xiaomi:miuicloud-common:1.0-SNAPSHOT
     [INFO]----------------------------------------------------------------------
-    二级依赖“com.xiaomi:miuicloud-common:jar:1.0-SNAPSHOT:compile”至少有5个孩子节点
+    二级依赖“com.xiaomi:miuicloud-common:1.0-SNAPSHOT”至少有5个孩子节点
 
 
 
@@ -187,39 +188,50 @@ optional arguments:
     ./TraverseJar.py ~/boss-operations/pom.xml -dc
 
     Output:
-    "org/springframework/web/context/request/RequestContextListener.class" found in ['spring-2.5.6.SEC01.jar', 'spring-web-2.5.6.SEC01.jar']
+    "org.springframework.web.context.request.RequestContextListener" found in ['spring-2.5.6.SEC01.jar', 'spring-web-2.5.6.SEC01.jar']
 
 (3.2) 根据类名找jar包 (1.2)
 给定的类名可以带包名，也可以不带包名，两种情况的输出结果可能不同。
 
 (3.2.1) 类不带包名
-    ./TraverseJar.py ~/boss-operations/pom.xml -fj RequestContextListener.class
+    ./TraverseJar.py ~/boss-operations/pom.xml -fj RequestContextListener
 
     Output:
-    "RequestContextListener.class" found in ['spring-2.5.6.SEC01.jar', 'spring-web-2.5.6.SEC01.jar']
-    com.xiaomi.miliao:miliao-serviceapi:jar:1.0.8:compile --> org.springframework:spring:jar:2.5.6.SEC01:compile
-    com.xiaomi.miliao:miliao-serviceapi:jar:1.0.8:compile --> org.springframework:spring-webmvc:jar:2.5.6.SEC01:compile --> org.springframework:spring-web:jar:2.5.6.SEC01:compile
+    "RequestContextListener" found in {'org.springframework.web.context.request.RequestContextListener': ['spring-2.5.6.SEC01.jar', 'spring-web-2.5.6.SEC01.jar']}
+    -------------------------------------------------------
+    com.xiaomi.miliao:miliao-serviceapi:1.0.8 --> org.springframework:spring:2.5.6.SEC01
+    com.xiaomi.miliao:miliao-serviceapi:1.0.8 --> org.springframework:spring-webmvc:2.5.6.SEC01 --> org.springframework:spring-web:2.5.6.SEC01
+
+    ~/mavenTool$ ./TraverseJar.py ~/boss-operations/pom.xml -fj Grammar
+
+    "Grammar" found in {'antlr.Grammar': ['antlr-2.7.2.jar'], 'org.apache.xerces.xni.grammars.Grammar': ['xercesImpl-2.9.1.jar'], 'antlr.preprocessor.Grammar': ['antlr-2.7.2.jar']}
+    -------------------------------------------------------
+    com.xiaomi.telecom.boss:boss-common:1.0.0-SNAPSHOT --> com.xiaomi:miuicloud-common:1.0-SNAPSHOT --> com.xiaomi:passport-service-api:0.0.26-SNAPSHOT --> org.apache.struts:struts-taglib:1.3.10 --> org.apache.struts:struts-core:1.3.10 --> antlr:antlr:2.7.2
+    com.xiaomi.telecom.boss:boss-common:1.0.0-SNAPSHOT --> com.xiaomi:miuicloud-common:1.0-SNAPSHOT --> com.xiaomi:passport-service-api:0.0.26-SNAPSHOT --> xerces:xercesImpl:2.9.1
+    com.xiaomi.telecom.boss:boss-common:1.0.0-SNAPSHOT --> com.xiaomi:miuicloud-common:1.0-SNAPSHOT --> com.xiaomi:passport-service-api:0.0.26-SNAPSHOT --> org.apache.struts:struts-taglib:1.3.10 --> org.apache.struts:struts-core:1.3.10 --> antlr:antlr:2.7.2
+
+
 
 (3.2.2) 类带了包名 (1.3)
-    ./TraverseJar.py ~/boss-operations/pom.xml -fj org/springframework/web/context/request/RequestContextListener.class
+    ./TraverseJar.py ~/boss-operations/pom.xml -fj org.springframework.web.context.request.RequestContextListener
 
     Output:
-    "org/springframework/web/context/request/RequestContextListener.class" found in ['spring-2.5.6.SEC01.jar', 'spring-web-2.5.6.SEC01.jar']
-    com.xiaomi.miliao:miliao-serviceapi:jar:1.0.8:compile --> org.springframework:spring:jar:2.5.6.SEC01:compile
-    com.xiaomi.miliao:miliao-serviceapi:jar:1.0.8:compile --> org.springframework:spring-webmvc:jar:2.5.6.SEC01:compile --> org.springframework:spring-web:jar:2.5.6.SEC01:compile
+    "org.springframework.web.context.request.RequestContextListener" found in ['spring-2.5.6.SEC01.jar', 'spring-web-2.5.6.SEC01.jar']
+    com.xiaomi.miliao:miliao-serviceapi:1.0.8 --> org.springframework:spring:2.5.6.SEC01
+    com.xiaomi.miliao:miliao-serviceapi:1.0.8 --> org.springframework:spring-webmvc:2.5.6.SEC01 --> org.springframework:spring-web:2.5.6.SEC01
 
 (3.3) 找出有重复版本或者有版本冲突的依赖
     ./TraverseJar.py ~/boss-operations/pom.xml -fd
 
     Output:
     [INFO]----------Duplicated Jars Found----------
-    com.xiaomi:xiaomi-common-logger:jar:2.6.26:compile --> org.apache.thrift:thrift:jar:0.5.0-fix-thrift1190:compile  
+    com.xiaomi:xiaomi-common-logger:2.6.26 --> org.apache.thrift:thrift:0.5.0-fix-thrift1190  
     ---------------Omitted versions---------------- 
-    com.xiaomi.telecom.cdr:cdr-common:jar:0.0.1-SNAPSHOT:compile --> com.xiaomi:xiaomi-common-thrift:jar:2.5.6:compile --> com.xiaomi:xiaomi-thrift-shared:jar:2.0.3:compile --> org.apache.thrift:thrift:jar:0.5.0:compile
+    com.xiaomi.telecom.cdr:cdr-common:0.0.1-SNAPSHOT --> com.xiaomi:xiaomi-common-thrift:2.5.6 --> com.xiaomi:xiaomi-thrift-shared:2.0.3 --> org.apache.thrift:thrift:0.5.0
     ----------------------------------------------------------------------
     [INFO]----------------------------------------------------------------------
 
-    打包选择的版本为“org.apache.thrift:thrift:jar:0.5.0-fix-thrift1190:compile”，被忽略的为“org.apache.thrift:thrift:jar:0.5.0:compile”
+    打包选择的版本为“org.apache.thrift:thrift:0.5.0-fix-thrift1190”，被忽略的为“org.apache.thrift:thrift:0.5.0”
 
 
 

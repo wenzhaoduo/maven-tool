@@ -26,6 +26,16 @@ class Node:
         return self.parent
     def get_times(self):
         return self.times
+    def get_data_for_display(self):
+        data_spilt = self.data.split(":")
+        groupId = data_spilt[0]
+        artifactId = data_spilt[1]
+        version = data_spilt[-2]
+        if len(data_spilt) == 5:
+            return groupId + ":" + artifactId + ":" + version
+        else:
+            classifier = data_spilt[-3]
+        return groupId + ":" + artifactId + ":" + classifier + ":" + version
 
     def add_child(self, node):
         if self.__class__ == node.__class__:
@@ -115,12 +125,6 @@ class Node:
             result += child.build_with_children()
         return result
 
-    # def build_with_ancestors(self):
-    #     result = ""
-    #     if self.parent.level > 0:
-    #         result = self.parent.build_with_ancestors()
-    #     return result + self.toString()
-
     def build_with_ancestors(self):
         result = self.get_ancestors()
         ancestors = result.split("\n")
@@ -135,8 +139,8 @@ class Node:
         result = ""
         if self.parent.level > 0:
             result = self.parent.get_ancestors()
-        return result + self.data + "\n"
-######### END OF CLASS ######### 
+        return result + self.get_data_for_display() + "\n"
+
 
 def main():
     node = Node("hello world")

@@ -25,7 +25,7 @@ def find_common_dependency (pom, project_dir, common_times):
     try:
         proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
     except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
-        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the pom.xml.")
+        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the project.")
 
     tree = TreeBuilder(DEPENDENCY_TREE_FILE).build()
 
@@ -87,7 +87,7 @@ def add_used_undeclared_dependency (pom, project_dir):
         proc = subprocess.check_call(["mvn", "clean", "dependency:analyze"], stdout=analyze_pom) 
         proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
     except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
-        sys.exit ("[ERROR]: An error occurs when analyzing dependencies of project. Please check the pom.xml.")
+        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the project.")
     finally:
         analyze_pom.close()
 
@@ -123,7 +123,7 @@ def find_heavy_transitive_dependency (pom, project_dir, heavy_times):
     try:
         proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
     except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
-        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the pom.xml.")
+        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the project.")
 
     tree = TreeBuilder(DEPENDENCY_TREE_FILE).build()
 
@@ -168,14 +168,13 @@ def pretty_pom_run (element, indent, newline, level = 0):
         pretty_pom_run(subelement, indent, newline, level = level + 1) 
 
 
-def main():
+def main ():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("pom", help = "the path of pom file")
     parser.add_argument("-au", "--addundeclared", help = " add used and undeclared dependencies", action = "store_true")
     parser.add_argument("-fc", "--findcommon", help = "find all dependencies appearing frequently more than a given number")
     parser.add_argument("-fh", "--findheavy", help = "find all heavy transitive dependencies with children more than a given number")
-
 
     args = parser.parse_args()
 

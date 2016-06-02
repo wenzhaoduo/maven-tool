@@ -4,8 +4,6 @@
 import subprocess
 import argparse
 import os
-import glob
-import copy
 import zipfile
 from TreeBuilder import TreeBuilder
 from Node import Node
@@ -18,7 +16,7 @@ def get_all_classes (pom, project_dir = "", class_name = ""):
     try:
         proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
     except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
-        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the pom.xml.")
+        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the project.")
 
     tree = TreeBuilder("dependencyTree.txt").build()
     proc = subprocess.check_call(["rm", "dependencyTree.txt"])
@@ -30,7 +28,7 @@ def get_all_classes (pom, project_dir = "", class_name = ""):
     if class_name == "": #no classes given
         show_duplicate_classes (classes_jar_dict)
     else:
-        class_len = class_name.split("/")
+        class_len = class_name.split(".")
         if len(class_len) > 1:
             full_path = True
         else:
@@ -82,7 +80,6 @@ def generate_jar_path (jar):
 def get_classes(jar_path):
     classes_list = []
     if not os.path.exists(jar_path):
-        # print ("[ERROR] " + jar_path + " not found. Its scope might be system.")
         return classes_list
         
     zf = zipfile.ZipFile(jar_path, 'r')
@@ -91,6 +88,8 @@ def get_classes(jar_path):
         for item in lst:
             file = item.filename
             if  file.endswith('.class') and "$" not in file: #ignore inner classes or anonymous class
+                file = file[:-6]
+                file = file.replace("/", ".")
                 classes_list.append(file)
     finally:
         zf.close()
@@ -119,23 +118,38 @@ def find_jar (class_name, classes_jar_dict, jar_dependency_dict, tree, full_path
         print ("[WARNING] " + class_name + "not found\n")
         return
 
-    jar_list  = []
+    jar_list = []
+    class_jar_dict = {}
     if full_path:
         jar_list = classes_jar_dict[class_name]
+        print ("\n\""+ class_name+ "\" found in", jar_list)
+        print ("-------------------------------------------------------")
+
+        for jar in jar_list:
+            dependency_list = jar_dependency_dict.get(jar)
+            for dependency in dependency_list:
+                node = tree.find(Node(dependency))
+                print (node.build_with_ancestors())
 
     else:
         for class_temp in classes_jar_dict:
-            class_temp_name = class_temp.split("/")[-1]
+            class_temp_name = class_temp.split(".")[-1]
             if class_temp_name == class_name:
                 for jar in classes_jar_dict[class_temp]:
                     jar_list.append(jar)
+                class_jar_dict[class_temp] = jar_list
+                jar_list = []
 
-    print ("\n\""+ class_name+ "\" found in", jar_list)
-    for jar in jar_list:
-        dependency_list = jar_dependency_dict.get(jar)
-        for dependency in dependency_list:
-            node = tree.find(Node(dependency))
-            print (node.build_with_ancestors())
+        print ("\n\""+ class_name+ "\" found in", class_jar_dict)
+        print ("-------------------------------------------------------")
+
+        for key in class_jar_dict:
+            jar_list = class_jar_dict.get(key)
+            for jar in jar_list:
+                dependency_list = jar_dependency_dict.get(jar)
+                for dependency in dependency_list:
+                    node = tree.find(Node(dependency))
+                    print (node.build_with_ancestors())
 
     print ("")
 
@@ -147,7 +161,7 @@ def find_duplicate_dependency (pom, project_dir):
     try:
         proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
     except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
-        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the pom.xml.")
+        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the project.")
 
     tree = TreeBuilder("dependencyTree.txt").build()
     proc = subprocess.check_call(["rm", "dependencyTree.txt"])

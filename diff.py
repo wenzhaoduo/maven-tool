@@ -14,7 +14,7 @@ def find_diff (project_dir):
     try:
         proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
     except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
-        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the pom.xml.")
+        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the project.")
 
     proc = subprocess.check_call(["mv", "pom.xml", "new_pom.xml"])
     proc = subprocess.check_call(["mv", "pomBase.xml", "pom.xml"])
@@ -22,13 +22,15 @@ def find_diff (project_dir):
     try:
         proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=oldDependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
     except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
-        sys.exit ("[ERROR]: An error occurs when generating dependency tree of old version project. Please check the old version pom.xml.")
+        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the project.")
 
     proc = subprocess.check_call(["mv", "pom.xml", "pomBase.xml"])
     proc = subprocess.check_call(["mv", "new_pom.xml", "pom.xml"])
 
     old_tree = TreeBuilder("oldDependencyTree.txt").build()
     new_tree = TreeBuilder("dependencyTree.txt").build()
+
+    proc = subprocess.check_call(["rm", "dependencyTree.txt", "oldDependencyTree.txt", "pomBase.xml"])
 
     new_dependency = []
 
@@ -39,8 +41,6 @@ def find_diff (project_dir):
     print ("[INFO]-----------------New dependencies-----------------")
     print_new_dependency(new_tree, new_dependency)
     print ("[INFO]-----------------------------------------------------------------------------\n")
-
-    proc = subprocess.check_call(["rm", "dependencyTree.txt", "oldDependencyTree.txt", "pomBase.xml"])
 
 
 def find_diff_and_new (children, old_tree, new_dependency):
