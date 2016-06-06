@@ -18,7 +18,7 @@ MODIFIED_DEPENDENCY_FILE = "modifiedDependency.txt"
 
 
 # find the dependencies used commonly
-def find_common_dependency (pom, project_dir, common_times):
+def find_common_dependency (pom, project_dir, common_times, outputfile):
     if project_dir != "":
         os.chdir(project_dir)
 
@@ -29,22 +29,69 @@ def find_common_dependency (pom, project_dir, common_times):
 
     tree = TreeBuilder(DEPENDENCY_TREE_FILE).build()
 
-    find_common (pom, tree.root, common_times)
+    find_common (pom, tree.root, common_times, outputfile)
 
     proc = subprocess.check_call(["rm", DEPENDENCY_TREE_FILE])
 
 
-def find_common (pom, root, common_times):
+def find_common (pom, root, common_times, outputfile):
     for child in root.children:
         if child.get_times() >= int(common_times) and child.get_level() > 1: #if a dependency appear frequently more than common_times, declare it in the pom.xml
             # add_dependency(pom, child)
-            print(child.build_with_ancestors())
+            if outputfile == "":
+                print(child.build_with_ancestors() + "\n")
+            else:
+                with open(outputfile, "a") as f:
+                    f.write(child.build_with_ancestors() + "\n\n")
 
-        find_common (pom, child, common_times)
+        find_common (pom, child, common_times, outputfile)
 
 
-def add_dependency (pom, node):
-    print(node.build_with_ancestors())
+def add_used_undeclared_dependency (pom, project_dir, outputfile): 
+    if project_dir != "":
+        os.chdir(project_dir)
+
+    analyze_output = "dependencyAnalyze.txt"
+    analyze_pom = open(analyze_output, "w")  #write the result of analyze to this file
+    try:
+        proc = subprocess.check_call(["mvn", "clean", "dependency:analyze"], stdout=analyze_pom) 
+        proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
+    except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
+        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the project.")
+    finally:
+        analyze_pom.close()
+
+    tree = TreeBuilder(DEPENDENCY_TREE_FILE).build()
+    node = ""
+
+    analyze_pom = open(analyze_output, "r")
+    data = ""
+    flag = False
+    return_status = False #decide whether calling this function again
+    for line in analyze_pom:
+        if line == "[WARNING] Used undeclared dependencies found:\n":
+            flag = True
+            continue
+
+        elif flag and not line.startswith("[WARNING]    "):
+            break
+
+        if flag:
+            data = line.strip("[WARNING] \n")
+            found_node = tree.root.find(Node(data))
+            add_dependency(pom, found_node, outputfile)
+
+    analyze_pom.close()
+    proc = subprocess.check_call(["rm", analyze_output, DEPENDENCY_TREE_FILE])
+    return return_status
+
+
+def add_dependency (pom, node, outputfile):
+    if outputfile == "":
+        print (node.build_with_ancestors() + "\n")
+    else:
+        with open (outputfile, "a") as f:
+            f.write (node.build_with_ancestors() + "\n\n")
 
     tree = ET.parse(pom)
     root = tree.getroot()
@@ -77,46 +124,7 @@ def add_dependency (pom, node):
     tree.write(pom, method = "xml")
 
 
-def add_used_undeclared_dependency (pom, project_dir): 
-    if project_dir != "":
-        os.chdir(project_dir)
-
-    analyze_output = "dependencyAnalyze.txt"
-    analyze_pom = open(analyze_output, "w")  #write the result of analyze to this file
-    try:
-        proc = subprocess.check_call(["mvn", "clean", "dependency:analyze"], stdout=analyze_pom) 
-        proc = subprocess.check_call(["mvn", "clean", "dependency:tree", "-Dverbose", "-Doutput=dependencyTree.txt", "-DoutputType=text"], stdout=subprocess.PIPE) 
-    except  subprocess.CalledProcessError: # if something wrong with pom.xml, mvn dependency:analyze will not execute successfully, so we raise an error and stop the program
-        sys.exit ("[ERROR]: An error occurs when generating dependency tree of project. Please check the project.")
-    finally:
-        analyze_pom.close()
-
-    tree = TreeBuilder(DEPENDENCY_TREE_FILE).build()
-    node = ""
-
-    analyze_pom = open(analyze_output, "r")
-    data = ""
-    flag = False
-    return_status = False #decide whether calling this function again
-    for line in analyze_pom:
-        if line == "[WARNING] Used undeclared dependencies found:\n":
-            flag = True
-            continue
-
-        elif flag and not line.startswith("[WARNING]    "):
-            break
-
-        if flag:
-            data = line.strip("[WARNING] \n")
-            found_node = tree.root.find(Node(data))
-            add_dependency(pom, found_node)
-
-    analyze_pom.close()
-    proc = subprocess.check_call(["rm", analyze_output, DEPENDENCY_TREE_FILE])
-    return return_status
-
-
-def find_heavy_transitive_dependency (pom, project_dir, heavy_times):
+def find_heavy_transitive_dependency (pom, project_dir, heavy_times, outputfile):
     if project_dir != "":
         os.chdir(project_dir)
 
@@ -131,7 +139,11 @@ def find_heavy_transitive_dependency (pom, project_dir, heavy_times):
         for grandchild in child.children: #second level dependency
             children_number = count_children(grandchild) + 1
             if children_number >= int(heavy_times):
-                print (grandchild.get_data())
+                if outputfile == "":
+                    print (grandchild.get_data_for_display())
+                else:
+                    with open(outputfile, "a") as f:
+                        f.write (grandchild.get_data_for_display() + "\n")
 
     proc = subprocess.check_call(["rm", DEPENDENCY_TREE_FILE])
 
@@ -172,38 +184,75 @@ def main ():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("pom", help = "the path of pom file")
-    parser.add_argument("-au", "--addundeclared", help = " add used and undeclared dependencies", action = "store_true")
+    parser.add_argument("-au", "--addundeclared", help = "add used and undeclared dependencies", action = "store_true")
     parser.add_argument("-fc", "--findcommon", help = "find all dependencies appearing frequently more than a given number")
     parser.add_argument("-fh", "--findheavy", help = "find all heavy transitive dependencies with children more than a given number")
+    parser.add_argument("-of", "--outputfile", help = "output the result to file")
 
     args = parser.parse_args()
 
     project_dir = os.path.dirname(args.pom)
 
+    if args.outputfile:
+        temp = args.outputfile.split("/")
+        if len(temp) == 1:
+            args.outputfile = project_dir + "/" + args.outputfile
+
+        with open(args.outputfile, "w") as f: #clean the output file
+            f.write("")
+    else:
+        args.outputfile = ""
+
     if args.findcommon:
-        print ("[INFO]----------Commonly Used Dependencies Found----------\n")
+        if args.outputfile == "":
+            print ("[INFO]----------Commonly Used Dependencies Found----------\n")
+        else:
+            with open(args.outputfile, "a") as f: 
+                f.write ("[INFO]----------Commonly Used Dependencies Found----------\n\n")
 
-        find_common_dependency(args.pom, project_dir, args.findcommon)
+        find_common_dependency(args.pom, project_dir, args.findcommon, args.outputfile)
 
-        print ("[INFO]----------------------------------------------------------------------\n")
+        if args.outputfile == "":
+            print ("[INFO]----------------------------------------------------------------------")
+        else:
+            with open(args.outputfile, "a") as f: 
+                f.write ("[INFO]----------------------------------------------------------------------\n\n")
+
+        print ("")
 
         
     if args.addundeclared:
-        print ("[INFO]----------Adding Used Undeclared Dependencies----------\n")
+        if args.outputfile == "":
+            print ("[INFO]----------Used Undeclared Dependencies Found----------\n")
+        else:
+            with open(args.outputfile, "a") as f: 
+                f.write ("[INFO]----------Used Undeclared Dependencies Found----------\n\n")
 
-        status = add_used_undeclared_dependency(args.pom, project_dir)
+        status = add_used_undeclared_dependency(args.pom, project_dir, args.outputfile)
         while status:
-            status = add_used_undeclared_dependency(args.pom, project_dir)
+            status = add_used_undeclared_dependency(args.pom, project_dir, args.outputfile)
 
-        print ("[INFO]----------------------------------------------------------------------\n")
+        if args.outputfile == "":
+            print ("[INFO]----------------------------------------------------------------------\n")
+        else:
+            with open(args.outputfile, "a") as f: 
+                f.write ("[INFO]----------------------------------------------------------------------\n\n")
         
 
     if args.findheavy:
-        print ("[INFO]----------Heavy Level 2 Dependencies Found----------\n")
+        if args.outputfile == "":
+            print ("[INFO]----------Heavy Level 2 Dependencies Found----------\n")
+        else:
+            with open(args.outputfile, "a") as f: 
+                f.write ("[INFO]----------Heavy Level 2 Dependencies Found----------\n\n")
 
-        find_heavy_transitive_dependency(args.pom, project_dir, args.findheavy)
+        find_heavy_transitive_dependency(args.pom, project_dir, args.findheavy, args.outputfile)
 
-        print ("[INFO]----------------------------------------------------------------------\n")
+        if args.outputfile == "":
+            print ("[INFO]----------------------------------------------------------------------\n")
+        else:
+            with open(args.outputfile, "a") as f: 
+                f.write ("[INFO]----------------------------------------------------------------------\n\n")
 
 
     if args.addundeclared:
