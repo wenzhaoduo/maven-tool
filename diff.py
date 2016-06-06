@@ -117,7 +117,7 @@ def main():
     parser.add_argument("pom", help = "the path of pom.xml")
 
     parser.add_argument("-b", "--branch", help = "select a branch. Default branch is master")
-    parser.add_argument("-v", "--version", help = "select a version number. This will ignore the branch even if branch is given")
+    parser.add_argument("-v", "--version", help = "select a version number. The branch will be ignored even if branch is given")
     parser.add_argument("-of", "--outputfile", help = "output the result to file")
 
     args = parser.parse_args()

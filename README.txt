@@ -30,23 +30,26 @@ step2
 
 (2) Command Line Arguments
 
-usage: diff.py [-h] [-b BRANCH] [-v VERSION] pom
+usage: diff.py [-h] [-b BRANCH] [-v VERSION] [-of OUTPUTFILE] pom
 
 positional arguments:
   pom                   the path of pom.xml
 
 optional arguments:
-  -h, --help    show this help message and exit
+  -h, --help            show this help message and exit
   -b BRANCH, --branch BRANCH
-                            select a branch. Default branch is master
+                        select a branch. Default branch is master
   -v VERSION, --version VERSION
-                            select a version number. This will ignore the branch
-                            even if branch is given
+                        select a version number. The branch will be ignored
+                        even if branch is given
+  -of OUTPUTFILE, --outputfile OUTPUTFILE
+                        output the result to file
+
 
 (3) Example
 
-(3.1) 比较本地pom.xml 和 master 分支下最新的pom.xml
-    ./diff.py ~/boss-operations/pom.xml
+(3.1) 比较本地pom.xml 和 master 分支下最新的pom.xml，结果输出到~/boss-operations/result.txt
+    ./diff.py ~/boss-operations/pom.xml -of result.txt
 
 (3.1) 比较本地pom.xml 和 maven-dev 分支下最新的pom.xml
     ./diff.py ~/boss-operations/pom.xml -b maven-dev
@@ -113,13 +116,14 @@ optional arguments:
  -fd, --findduplicate  #(1.4)
                        find all dependencies if they have different versions
                        or they appear more than oncef
-
+  -of OUTPUTFILE, --outputfile OUTPUTFILE
+                        output the result to file
 
 
 (3) Example
 
-(3.1) 找出常用的依赖(1.1)
-    ./AnalyzeDependency.py ~/boss-operations/pom.xml -fc 5
+(3.1) 找出常用的依赖，结果输出到~/boss-operations/result.txt (1.1)
+    ./AnalyzeDependency.py ~/boss-operations/pom.xml -fc 5 -of result.txt
 
     Output:
     [INFO]----------Commonly used dependencies Found----------
@@ -180,12 +184,14 @@ optional arguments:
   -dj, --duplicatejar  #(1.3)
                         find all jars if they have different versions or they
                         repeat the same version
+  -of OUTPUTFILE, --outputfile OUTPUTFILE
+                        output the result to file
 
 
 (3) Example
 
-(3.1) 找出重复的类 (1.1)
-    ./TraverseJar.py ~/boss-operations/pom.xml -dc
+(3.1) 找出重复的类，结果输出到~/boss-operations/result.txt (1.1)
+    ./TraverseJar.py ~/boss-operations/pom.xml -dc -of result.txt
 
     Output:
     "org.springframework.web.context.request.RequestContextListener" found in ['spring-2.5.6.SEC01.jar', 'spring-web-2.5.6.SEC01.jar']
