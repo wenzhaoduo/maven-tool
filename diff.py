@@ -30,7 +30,7 @@ def find_diff (project_dir, outputfile):
     old_tree = TreeBuilder("oldDependencyTree.txt").build()
     new_tree = TreeBuilder("dependencyTree.txt").build()
 
-    proc = subprocess.check_call(["rm", "dependencyTree.txt", "oldDependencyTree.txt", "pomBase.xml"])
+    # proc = subprocess.check_call(["rm", "dependencyTree.txt", "oldDependencyTree.txt", "pomBase.xml"])
 
     new_dependency = []
 
@@ -63,17 +63,28 @@ def find_diff_and_new (children, old_tree, new_dependency, outputfile):
         if child.omitted:
             continue
 
-        if old_tree.contains_ignore_version(child) and not old_tree.contains(child):
+        if old_tree.contains_ignore_version(child) and not old_tree.contains(child, True):
             found_node = old_tree.find_ignore_version(child)
+            same_version = False
+            if found_node.get_version() == child.get_version():
+                same_version = True
+
             parent = child
             while parent.level > 1:
                 parent = parent.get_parent()
 
             if outputfile == "":
-                print ("\"" + found_node.get_data_for_display() + "\" --> \"" + child.get_data_for_display() + "\" UNDER \"" + parent.get_data_for_display() + "\"\n")
+                if not same_version:
+                    print ("\"" + found_node.get_data_for_display() + "\" --> \"" + child.get_data_for_display() + "\" UNDER \"" + parent.get_data_for_display() + "\"\n")
+                else:
+                    print ("\"" + found_node.get_data() + "\" --> \"" + child.get_data() + "\" UNDER \"" + parent.get_data_for_display() + "\"\n")
             else:
-                with open (outputfile, "a") as f:
-                    f.write ("\"" + found_node.get_data_for_display() + "\" --> \"" + child.get_data_for_display() + "\" UNDER \"" + parent.get_data_for_display() + "\"\n\n")
+                if not same_version:
+                    with open (outputfile, "a") as f:
+                        f.write ("\"" + found_node.get_data_for_display() + "\" --> \"" + child.get_data_for_display() + "\" UNDER \"" + parent.get_data_for_display() + "\"\n\n")
+                else:
+                    with open (outputfile, "a") as f:
+                        f.write ("\"" + found_node.get_data() + "\" --> \"" + child.get_data() + "\" UNDER \"" + parent.get_data_for_display() + "\"\n")
 
         elif not old_tree.contains_ignore_version(child):
             new_dependency.append(child)

@@ -10,11 +10,13 @@ class Node:
         self.children = []
         self.groupId = ""
         self.artifactId = ""
+        self.version = ""
 
         if data != "":
-            data_spilt = data.split(":")
-            self.groupId = data_spilt[0]
-            self.artifactId = data_spilt[1]
+            data_split = data.split(":")
+            self.groupId = data_split[0]
+            self.artifactId = data_split[1]
+            self.version = data_split[-2]
 
     def get_data(self):
         return self.data
@@ -26,15 +28,17 @@ class Node:
         return self.parent
     def get_times(self):
         return self.times
+    def get_version(self):
+        return self.version
     def get_data_for_display(self):
-        data_spilt = self.data.split(":")
-        groupId = data_spilt[0]
-        artifactId = data_spilt[1]
-        version = data_spilt[-2]
-        if len(data_spilt) == 5:
+        data_split = self.data.split(":")
+        groupId = data_split[0]
+        artifactId = data_split[1]
+        version = data_split[-2]
+        if len(data_split) == 5:
             return groupId + ":" + artifactId + ":" + version
         else:
-            classifier = data_spilt[-3]
+            classifier = data_split[-3]
         return groupId + ":" + artifactId + ":" + classifier + ":" + version
 
     def add_child(self, node):
@@ -102,10 +106,12 @@ class Node:
     def find_ignore_version(self, other): #find an dependency with the same groupId and artifactId as self
         found_flag = None
         if self.__class__ == other.__class__:
-            if not self.omitted and self.groupId == other.groupId and self.artifactId == other.artifactId:
+            if self.groupId == other.groupId and self.artifactId == other.artifactId:
                 found_flag = self
             else:
                 for child in self.children:
+                    if child.omitted:
+                        continue
                     found_flag = child.find_ignore_version(other)
                     if found_flag != None:
                         break

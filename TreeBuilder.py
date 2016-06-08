@@ -77,29 +77,30 @@ class TreeBuilder:
         return self.tree
 
 
-#TODO: print build with ancestors with -->
 def main():
 
-    dataFile = "/home/mi/boss-operations/dependencyTree.txt"
+    dataFile = "/home/mi/boss-operations/oldDependencyTree.txt"
     tree = TreeBuilder(dataFile).build()
 
-    # print(tree.toString())
-    for i in range (0, len(tree.root.children)):
-        print (i)
+    raw_node_text = "javax.servlet.jsp:jsp-api:jar:2.1:compile"
+    node = Node(raw_node_text)
+    print (tree.contains(node, True))
+    print (tree.contains_ignore_version(node))
 
-    # raw_node_text = "|  |  |        +- org.apache.avro:avro:jar:1.5.3:compile"
-    # raw_node_text = "|  |        +- com.xiaomi.mfs.common:mfs-common:jar:1.2.6:compile"
-    # print (TreeBuilder(dataFile).compute_level(raw_node_text))
-    # print (tree.find(Node(raw_node_text)))
-    # found_node = tree.find_contain_omitted(Node(raw_node_text))
+    found_node = tree.find_ignore_version(node)
+    print (found_node.data)
+    print (found_node.omitted)
 
-    # for node in found_node:
-    #     print (node.build_with_ancestors())
-    # print (found_node.times)
 
-    # print(found_node.toString(False))
-    # print(found_node.build_with_children())
-    # print(found_node.build_with_ancestors(False))
+    dataFile1 = "/home/mi/boss-operations/DependencyTree.txt"
+    tree1 = TreeBuilder(dataFile).build()
+
+    raw_node_text1 = "javax.servlet.jsp:jsp-api:jar:2.1:compile"
+    found_node1 = tree1.find(Node(raw_node_text1))
+    print (tree1.contains(found_node1, True))
+    print (found_node1.data)
+    print (found_node1.omitted)
+
 
 if __name__ == '__main__':
     main()
