@@ -40,7 +40,7 @@ AnalyzeDependency.py
                            find all heavy transitive dependencies with children
                            more than a given number
       -of OUTPUTFILE, --outputfile OUTPUTFILE
-                            output the result to file
+                           output the result to file
 
 
 * Example
