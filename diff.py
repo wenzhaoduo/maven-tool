@@ -137,7 +137,7 @@ def main():
 
     if args.outputfile:
         temp = args.outputfile.split("/")
-        if len(temp) == 1:
+        if len(temp) == 1 and project_dir != "":
             args.outputfile = project_dir + "/" + args.outputfile
 
         with open(args.outputfile, "w") as f: #clean the output file

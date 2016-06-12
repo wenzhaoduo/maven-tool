@@ -2,6 +2,7 @@
 # -*- coding: utf8 -*-
 
 import subprocess
+import getpass
 import argparse
 import os, sys
 import zipfile
@@ -68,11 +69,12 @@ def traverse_tree (root, classes_jar_dict, jar_dependency_dict):
 def generate_jar_path (jar):
     jar_info = jar.split(":")
     groupId = jar_info[0].replace(".", "/")
+    user = getpass.getuser()
 
     if len(jar_info) == 5:
-        path = "/home/mi/.m2/repository/" + groupId + "/" + jar_info[1] + "/" + jar_info[-2] + "/" + jar_info[1] + "-" + jar_info[-2] + ".jar"
+        path = "/home/" + user+ "/.m2/repository/" + groupId + "/" + jar_info[1] + "/" + jar_info[-2] + "/" + jar_info[1] + "-" + jar_info[-2] + ".jar"
     elif len(jar_info) == 6: #dependency has a classifier element
-        path = "/home/mi/.m2/repository/" + groupId + "/" + jar_info[1] + "/" + jar_info[-2] + "/" + jar_info[1] + "-" + jar_info[-2] + "-" + jar_info[-3] + ".jar"
+        path = "/home/" + user+ "/.m2/repository/" + groupId + "/" + jar_info[1] + "/" + jar_info[-2] + "/" + jar_info[1] + "-" + jar_info[-2] + "-" + jar_info[-3] + ".jar"
 
     return path
 
@@ -255,7 +257,7 @@ def main():
 
     if args.outputfile:
         temp = args.outputfile.split("/")
-        if len(temp) == 1:
+        if len(temp) == 1 and project_dir != "":
             args.outputfile = project_dir + "/" + args.outputfile
 
         with open(args.outputfile, "w") as f: #clean the output file

@@ -37,24 +37,25 @@ class TreeBuilder:
         error_level = False
         error_parent = None
 
-        pattern = re.compile("(?<=\\()(.+?)(?=\\))")
+        pattern = re.compile("- \(.*\)") #match "- ()"
         for raw_node in node_list:
             temp = re.findall(pattern, raw_node)
             if len(temp) > 0: # This is an omitted node
-                omitted_node_data = temp[0].split(" - ")[0]
+                pattern1 = re.compile("(?<=\\()(.+?)(?=\\))") #match "()"
+                temp1 = re.findall(pattern1, str(temp))
+                omitted_node_data = temp1[0].split(" - ")[0].strip()
                 child = Node(omitted_node_data, True)
                 if self.tree.contains(child, True):
                     found_node = self.tree.find(child)
-                    if found_node == None:
-                        print (raw_node)
                     found_node.times = found_node.times + 1
                 elif omitted_node_data in self.omitted_dict:
                     self.omitted_dict[omitted_node_data] = self.omitted_dict[omitted_node_data] + 1
                 else:
                     self.omitted_dict[omitted_node_data] = 1
-                # continue
             else: #This is not an omitted node
-                child = Node(raw_node.split("- ")[1])
+                pattern1 = re.compile(" \(.*\)")
+                temp1 = re.sub(pattern1, "", raw_node)
+                child = Node(temp1.split("- ")[1].strip())
                 if child.data in self.omitted_dict:
                     child.times = self.omitted_dict[child.data] + 1
 
@@ -79,27 +80,8 @@ class TreeBuilder:
 
 def main():
 
-    dataFile = "/home/mi/boss-operations/oldDependencyTree.txt"
+    dataFile = "/home/mi/boss-common/dependencyTree.txt"
     tree = TreeBuilder(dataFile).build()
-
-    raw_node_text = "javax.servlet.jsp:jsp-api:jar:2.1:compile"
-    node = Node(raw_node_text)
-    print (tree.contains(node, True))
-    print (tree.contains_ignore_version(node))
-
-    found_node = tree.find_ignore_version(node)
-    print (found_node.data)
-    print (found_node.omitted)
-
-
-    dataFile1 = "/home/mi/boss-operations/DependencyTree.txt"
-    tree1 = TreeBuilder(dataFile).build()
-
-    raw_node_text1 = "javax.servlet.jsp:jsp-api:jar:2.1:compile"
-    found_node1 = tree1.find(Node(raw_node_text1))
-    print (tree1.contains(found_node1, True))
-    print (found_node1.data)
-    print (found_node1.omitted)
 
 
 if __name__ == '__main__':
